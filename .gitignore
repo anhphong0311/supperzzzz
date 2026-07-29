@@ -1,0 +1,11 @@
+node_modules/
+out/
+dist/
+release/
+data/app.db
+data/app.db-journal
+data/screenshots/
+data/uploads/
+*.log
+.DS_Store
+.claude/

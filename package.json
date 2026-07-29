@@ -1,0 +1,43 @@
+{
+  "name": "fb-multi-poster",
+  "version": "0.1.0",
+  "description": "Cong cu ho tro dang bai len nhieu nhom Facebook bang nhieu tai khoan (MVP)",
+  "private": true,
+  "main": "out/main/index.js",
+  "author": "",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "db:init": "node src/main/db/initDb.js",
+    "db:seed": "node src/main/db/seed.js",
+    "pack": "npm run build && electron-builder --dir",
+    "dist:win": "npm run build && electron-builder --win"
+  },
+  "dependencies": {
+    "playwright": "^1.47.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "sql.js": "^1.11.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.3",
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^31.3.1",
+    "electron-builder": "^24.13.3",
+    "electron-vite": "^2.3.0",
+    "vite": "^5.4.2"
+  },
+  "build": {
+    "appId": "com.local.fbmultiposter",
+    "productName": "FB Multi Poster",
+    "files": [
+      "out/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  }
+}
