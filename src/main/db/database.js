@@ -139,6 +139,67 @@ function buildWrapper() {
   }
 }
 
+function tableHasColumn(db, table, column) {
+  const res = db.exec(`PRAGMA table_info(${table})`)
+  if (!res[0]) return false
+  const nameIdx = res[0].columns.indexOf('name')
+  return res[0].values.some((row) => row[nameIdx] === column)
+}
+
+/**
+ * Migrate cac DB da ton tai tu truoc khi co tinh nang dang video/trang ca
+ * nhan/fanpage. CREATE TABLE IF NOT EXISTS trong schema.js KHONG tu them cot
+ * hay doi rang buoc cho bang da co san, nen phai tu xu ly o day. Idempotent:
+ * chi chay khi cot con thieu, an toan goi lai nhieu lan.
+ */
+function migrate(db) {
+  if (!tableHasColumn(db, 'facebook_accounts', 'fanpage_url')) {
+    db.run('ALTER TABLE facebook_accounts ADD COLUMN fanpage_url TEXT')
+  }
+
+  if (!tableHasColumn(db, 'post_jobs', 'target_type')) {
+    // SQLite khong ho tro sua NOT NULL/them cot co rang buoc phu thuoc bang
+    // khac truc tiep -> phai dung ky thuat rebuild bang chuan cua SQLite:
+    // tao bang moi -> copy du lieu (job cu mac dinh la GROUP) -> xoa bang cu
+    // -> doi ten bang moi. Tat foreign_keys trong luc rebuild de tranh loi
+    // tam thoi khi bang post_jobs khong ton tai.
+    db.run('PRAGMA foreign_keys = OFF')
+    db.run(`
+      CREATE TABLE post_jobs_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        account_id INTEGER NOT NULL REFERENCES facebook_accounts(id),
+        target_type TEXT NOT NULL DEFAULT 'GROUP',
+        group_id INTEGER REFERENCES facebook_groups(id),
+        status TEXT NOT NULL DEFAULT 'CHUA_XU_LY',
+        facebook_post_url TEXT,
+        posted_at TEXT,
+        last_checked_at TEXT,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        error_code TEXT,
+        error_message TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `)
+    db.run(`
+      INSERT INTO post_jobs_new
+        (id, post_id, account_id, target_type, group_id, status, facebook_post_url,
+         posted_at, last_checked_at, retry_count, error_code, error_message, created_at, updated_at)
+      SELECT id, post_id, account_id, 'GROUP', group_id, status, facebook_post_url,
+             posted_at, last_checked_at, retry_count, error_code, error_message, created_at, updated_at
+      FROM post_jobs
+    `)
+    db.run('DROP TABLE post_jobs')
+    db.run('ALTER TABLE post_jobs_new RENAME TO post_jobs')
+    db.run('CREATE INDEX IF NOT EXISTS idx_post_jobs_post ON post_jobs(post_id)')
+    db.run('CREATE INDEX IF NOT EXISTS idx_post_jobs_account ON post_jobs(account_id)')
+    db.run('CREATE INDEX IF NOT EXISTS idx_post_jobs_group ON post_jobs(group_id)')
+    db.run('CREATE INDEX IF NOT EXISTS idx_post_jobs_status ON post_jobs(status)')
+    db.run('PRAGMA foreign_keys = ON')
+  }
+}
+
 /**
  * Phai duoc goi (va cho hoan tat) MOT LAN khi ung dung khoi dong, truoc khi
  * bat ky service nao goi getDb(). Vi sql.js can nap module WASM bat dong bo.
@@ -161,6 +222,7 @@ async function initDb() {
   // truc tiep vao bundle khi dong goi cho Electron - xem ghi chu trong schema.js
   const schemaSql = require('./schema')
   rawDb.run(schemaSql)
+  migrate(rawDb)
 
   wrapper = buildWrapper()
   persist()

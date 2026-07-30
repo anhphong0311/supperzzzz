@@ -15,6 +15,7 @@ const JOB_STATUS = {
   FAILED: 'FAILED', // Dang that bai
   GROUP_UNAVAILABLE: 'GROUP_UNAVAILABLE', // Khong truy cap duoc nhom
   NOT_A_MEMBER: 'NOT_A_MEMBER', // Tai khoan chua tham gia nhom
+  TARGET_NOT_CONFIGURED: 'TARGET_NOT_CONFIGURED', // Dich dang (vd Fanpage) chua duoc cau hinh cho tai khoan
   LOGIN_EXPIRED: 'LOGIN_EXPIRED', // Phien dang nhap het han
   CHECKPOINT_REQUIRED: 'CHECKPOINT_REQUIRED', // Yeu cau xac minh / checkpoint / captcha
   UNKNOWN: 'UNKNOWN', // Khong xac dinh duoc trang thai
@@ -35,6 +36,7 @@ const JOB_STATUS_LABEL_VI = {
   FAILED: 'Đăng thất bại',
   GROUP_UNAVAILABLE: 'Không truy cập được nhóm',
   NOT_A_MEMBER: 'Tài khoản chưa tham gia nhóm',
+  TARGET_NOT_CONFIGURED: 'Đích đăng chưa được cấu hình',
   LOGIN_EXPIRED: 'Phiên đăng nhập hết hạn',
   CHECKPOINT_REQUIRED: 'Yêu cầu xác minh',
   UNKNOWN: 'Không xác định được trạng thái',
@@ -74,6 +76,7 @@ const TERMINAL_STATUSES = new Set([
   JOB_STATUS.FAILED,
   JOB_STATUS.GROUP_UNAVAILABLE,
   JOB_STATUS.NOT_A_MEMBER,
+  JOB_STATUS.TARGET_NOT_CONFIGURED,
   JOB_STATUS.LOGIN_EXPIRED,
   JOB_STATUS.CHECKPOINT_REQUIRED,
   JOB_STATUS.UNKNOWN,

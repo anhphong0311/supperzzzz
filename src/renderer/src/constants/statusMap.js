@@ -16,6 +16,7 @@ export const JOB_STATUS_LABEL_VI = {
   FAILED: 'Đăng thất bại',
   GROUP_UNAVAILABLE: 'Không truy cập được nhóm',
   NOT_A_MEMBER: 'Tài khoản chưa tham gia nhóm',
+  TARGET_NOT_CONFIGURED: 'Đích đăng chưa được cấu hình',
   LOGIN_EXPIRED: 'Phiên đăng nhập hết hạn',
   CHECKPOINT_REQUIRED: 'Yêu cầu xác minh',
   UNKNOWN: 'Không xác định được trạng thái',
@@ -36,6 +37,7 @@ export const JOB_STATUS_COLOR = {
   FAILED: 'red',
   GROUP_UNAVAILABLE: 'red',
   NOT_A_MEMBER: 'red',
+  TARGET_NOT_CONFIGURED: 'red',
   LOGIN_EXPIRED: 'amber',
   CHECKPOINT_REQUIRED: 'amber',
   UNKNOWN: 'gray',
@@ -62,4 +64,10 @@ export const GROUP_STATUS_LABEL_VI = {
   HOAT_DONG: 'Hoạt động',
   KHONG_HOAT_DONG: 'Không hoạt động',
   CHUA_XAC_DINH: 'Chưa xác định'
+}
+
+export const TARGET_TYPE_LABEL_VI = {
+  GROUP: 'Nhóm',
+  TIMELINE: 'Trang cá nhân',
+  PAGE: 'Fanpage'
 }

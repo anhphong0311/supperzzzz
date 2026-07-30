@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { toast } from '../lib/toast.js'
 import { LOGIN_STATUS_LABEL_VI, ACCOUNT_STATUS_LABEL_VI } from '../constants/statusMap'
 
-const emptyForm = { display_name: '', profile_name: '', browser_profile_path: '', notes: '' }
+const emptyForm = { display_name: '', profile_name: '', browser_profile_path: '', notes: '', fanpage_url: '' }
 
 export default function Accounts() {
   const [accounts, setAccounts] = useState([])
@@ -38,7 +38,8 @@ export default function Accounts() {
       display_name: acc.display_name,
       profile_name: acc.profile_name,
       browser_profile_path: acc.browser_profile_path,
-      notes: acc.notes || ''
+      notes: acc.notes || '',
+      fanpage_url: acc.fanpage_url || ''
     })
     setEditingId(acc.id)
     setShowForm(true)
@@ -135,16 +136,17 @@ export default function Accounts() {
               <th>Hoạt động</th>
               <th>Bài đã đăng hôm nay</th>
               <th>Đăng gần nhất</th>
+              <th>Fanpage</th>
               <th>Ghi chú</th>
               <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8} className="empty-state">Đang tải...</td></tr>
+              <tr><td colSpan={9} className="empty-state">Đang tải...</td></tr>
             )}
             {!loading && accounts.length === 0 && (
-              <tr><td colSpan={8} className="empty-state">Chưa có tài khoản nào. Nhấn "+ Thêm tài khoản" để bắt đầu.</td></tr>
+              <tr><td colSpan={9} className="empty-state">Chưa có tài khoản nào. Nhấn "+ Thêm tài khoản" để bắt đầu.</td></tr>
             )}
             {accounts.map((acc) => (
               <tr key={acc.id}>
@@ -162,6 +164,11 @@ export default function Accounts() {
                 </td>
                 <td>{acc.posts_today}</td>
                 <td className="text-muted">{acc.last_posted_at ? new Date(acc.last_posted_at).toLocaleString('vi-VN') : '—'}</td>
+                <td className="text-muted" style={{ maxWidth: 180, wordBreak: 'break-all' }}>
+                  {acc.fanpage_url
+                    ? <a href="#" onClick={(e) => { e.preventDefault(); window.api.system.openExternal(acc.fanpage_url) }}>{acc.fanpage_url}</a>
+                    : '—'}
+                </td>
                 <td className="text-muted">{acc.notes || '—'}</td>
                 <td>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -204,6 +211,11 @@ export default function Accounts() {
                 <button className="btn btn-sm" onClick={pickFolder}>Chọn thư mục</button>
               </div>
               <div className="hint">Mỗi tài khoản cần một thư mục riêng biệt để lưu phiên đăng nhập độc lập.</div>
+            </div>
+            <div className="field">
+              <label>Fanpage URL (tuỳ chọn)</label>
+              <input type="text" value={form.fanpage_url} onChange={(e) => setForm({ ...form, fanpage_url: e.target.value })} placeholder="https://www.facebook.com/ten-fanpage" />
+              <div className="hint">Chỉ nhập nếu tài khoản này là quản trị viên của một Fanpage bạn muốn đăng bài lên.</div>
             </div>
             <div className="field">
               <label>Ghi chú</label>

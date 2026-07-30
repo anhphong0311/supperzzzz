@@ -56,7 +56,8 @@ const api = {
     recheckJob: (jobId) => call('posts:recheckJob', jobId)
   },
   media: {
-    pickImages: () => call('media:pickImages')
+    pickImages: () => call('media:pickImages'),
+    pickVideos: () => call('media:pickVideos')
   },
   settings: {
     getAll: () => call('settings:getAll'),

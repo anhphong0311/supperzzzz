@@ -15,6 +15,20 @@ function sleep(ms) {
 }
 
 /**
+ * Quy doi 1 PostJob (+ tai khoan cua no) thanh doi tuong target ma
+ * postAutomation.executeJob can: { type, url, name }.
+ */
+function buildTarget(job, account) {
+  if (job.target_type === 'TIMELINE') {
+    return { type: 'TIMELINE', url: 'https://www.facebook.com/', name: 'Trang cá nhân' }
+  }
+  if (job.target_type === 'PAGE') {
+    return { type: 'PAGE', url: account.fanpage_url, name: 'Fanpage' }
+  }
+  return { type: 'GROUP', url: job.group_url, name: job.group_name }
+}
+
+/**
  * Xu ly hang doi dang bai TUAN TU: hoan thanh toan bo nhom cua 1 tai khoan
  * roi moi chuyen sang tai khoan tiep theo (muc 8). KHONG chay dong thoi
  * nhieu tai khoan trong phien ban dau tien.
@@ -74,7 +88,8 @@ class PostQueue extends EventEmitter {
     const dailyLimit = Number(settings.daily_post_limit_per_account || 20)
     const timeouts = {
       pageLoadMs: Number(settings.page_load_timeout_ms || 30000),
-      mediaUploadMs: Number(settings.media_upload_timeout_ms || 60000)
+      mediaUploadMs: Number(settings.media_upload_timeout_ms || 60000),
+      videoProcessingMs: Number(settings.video_processing_timeout_ms || 90000)
     }
     const headless = String(settings.headless_mode) === 'true'
     const autoCloseTab = String(settings.auto_close_tab) !== 'false'
@@ -155,16 +170,18 @@ class PostQueue extends EventEmitter {
           postId,
           jobId: job.id,
           accountName: account.display_name,
-          groupName: job.group_name,
+          targetName: job.target_name,
           status: JOB_STATUS.IN_PROGRESS,
           completedCount,
           totalJobs
         })
 
+        const target = buildTarget(job, account)
+
         try {
           const result = await executeJob({
             page,
-            groupUrl: job.group_url,
+            target,
             content: campaign.content,
             mediaPaths,
             dryRun: !!campaign.dry_run,
@@ -212,7 +229,7 @@ class PostQueue extends EventEmitter {
           postId,
           jobId: job.id,
           accountName: account.display_name,
-          groupName: job.group_name,
+          targetName: job.target_name,
           status: postService.getCampaign(postId).jobs.find((j) => j.id === job.id)?.status,
           completedCount,
           totalJobs

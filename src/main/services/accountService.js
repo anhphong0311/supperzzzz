@@ -18,8 +18,8 @@ function create(data) {
   const db = getDb()
   const stmt = db.prepare(`
     INSERT INTO facebook_accounts
-      (display_name, profile_name, browser_profile_path, login_status, account_status, notes)
-    VALUES (@display_name, @profile_name, @browser_profile_path, @login_status, @account_status, @notes)
+      (display_name, profile_name, browser_profile_path, login_status, account_status, notes, fanpage_url)
+    VALUES (@display_name, @profile_name, @browser_profile_path, @login_status, @account_status, @notes, @fanpage_url)
   `)
   const info = stmt.run({
     display_name: data.display_name,
@@ -27,7 +27,8 @@ function create(data) {
     browser_profile_path: data.browser_profile_path,
     login_status: data.login_status || 'CHUA_DANG_NHAP',
     account_status: data.account_status || 'HOAT_DONG',
-    notes: data.notes || null
+    notes: data.notes || null,
+    fanpage_url: data.fanpage_url || null
   })
   return get(info.lastInsertRowid)
 }
@@ -48,6 +49,7 @@ function update(id, data) {
       last_posted_at = @last_posted_at,
       last_checked_at = @last_checked_at,
       notes = @notes,
+      fanpage_url = @fanpage_url,
       updated_at = @updated_at
     WHERE id = @id
   `).run(merged)

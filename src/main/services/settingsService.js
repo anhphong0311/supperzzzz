@@ -5,6 +5,7 @@ const DEFAULTS = {
   delay_between_posts_seconds: '30',
   page_load_timeout_ms: '30000',
   media_upload_timeout_ms: '60000',
+  video_processing_timeout_ms: '90000',
   max_retry_count: '2',
   temp_media_dir: '',
   browser_executable_path: '',

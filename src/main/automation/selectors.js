@@ -2,6 +2,12 @@
  * ============================================================================
  * KHO SELECTOR TRUNG TAM CHO FACEBOOK
  * ============================================================================
+ * Ap dung cho CA 3 ngu canh dang bai: Nhom, Trang ca nhan (Timeline), Fanpage.
+ * Dialog soan bai (composer) cua Meta dung chung 1 bo giao dien giua 3 ngu
+ * canh nay, nen phan lon selector composer.* duoc dung chung - chi rieng
+ * openTrigger la co them cac cau chao khac nhau theo ngu canh (vd "Bạn đang
+ * nghĩ gì?" tren trang chu/Trang ca nhan, "Bạn viết gì đi..." trong nhom).
+ *
  * Giao dien Facebook thay doi thuong xuyen va khac nhau theo ngon ngu, loai
  * tai khoan, A/B test... Vi vay MOI selector duoc khai bao la MOT MANG cac
  * "ung vien" (candidates) thay vi mot chuoi duy nhat. He thong se thu tung
@@ -73,14 +79,18 @@ module.exports = {
     ]
   },
 
-  // Khu vuc tao bai viet trong nhom
+  // Khu vuc tao bai viet - dung chung cho Nhom / Trang chu (Trang ca nhan) / Fanpage
   composer: {
     openTrigger: [
       'div[role="button"]:has-text("Bạn viết gì đi...")',
       'div[role="button"]:has-text("Viết gì đó...")',
       'div[role="button"]:has-text("Write something")',
+      'div[role="button"]:has-text("Bạn đang nghĩ gì")',
+      'div[role="button"]:has-text("What\'s on your mind")',
       'div[role="button"][aria-label*="Tạo bài viết" i]',
-      'div[role="button"][aria-label*="Write a post" i]'
+      'div[role="button"][aria-label*="Write a post" i]',
+      'div[role="button"][aria-label*="viết gì" i]',
+      'div[role="button"][aria-label*="mind" i]'
     ],
     // Uu tien dialog co chua san o contenteditable (tranh khop nham dialog
     // khac dang mo tren trang, vi du popup thong bao). Selector cuoi cung
@@ -126,6 +136,20 @@ module.exports = {
     imageThumbnail: [
       'div[role="dialog"] img[referrerpolicy]'
     ],
+    // Video hien thi bang the <video> (khong phai <img>) sau khi tai len.
+    videoThumbnail: [
+      'div[role="dialog"] video'
+    ],
+    // Thanh tien trinh/spinner khi Facebook dang xu ly video da tai len -
+    // PHAI cho phan tu nay BIEN MAT truoc khi bam nut Dang, neu khong video
+    // co the bi dang thieu/loi. Facebook thuong hien % hoac vong xoay.
+    mediaProcessingIndicator: [
+      'div[role="dialog"] [role="progressbar"]',
+      'div[role="dialog"] text=/đang tải lên/i',
+      'div[role="dialog"] text=/uploading/i',
+      'div[role="dialog"] text=/đang xử lý/i',
+      'div[role="dialog"] text=/processing/i'
+    ],
     submitButton: [
       'div[role="dialog"] div[aria-label="Đăng"][role="button"]',
       'div[role="dialog"] div[aria-label="Post"][role="button"]',
@@ -133,6 +157,20 @@ module.exports = {
       'div[role="dialog"] div[role="button"]:has-text("Post")'
     ]
   },
+
+  // Nut chuyen danh tinh dang bai sang Fanpage khi mo composer tren trang
+  // Fanpage ma tai khoan quan tri (chi ap dung cho target_type = 'PAGE').
+  // BEST-EFFORT: nhieu giao dien Facebook tu dong dang voi tu cach Trang ma
+  // khong can buoc nay - neu khong tim thay selector nao trong danh sach,
+  // automation SE BO QUA (khong coi la loi) va dang tiep voi danh tinh hien
+  // tai. Neu bai dang bi sai danh tinh (dang bang tai khoan ca nhan thay vi
+  // Trang), can bo sung selector moi vao day sau khi kiem tra bang DevTools.
+  pageIdentitySwitch: [
+    'div[role="dialog"] div[aria-label*="Chuyển đổi" i][role="button"]',
+    'div[role="dialog"] div[role="button"]:has-text("Đăng với tư cách")',
+    'div[role="dialog"] div[role="button"]:has-text("Switch now")',
+    'div[role="dialog"] div[role="button"]:has-text("Post as")'
+  ],
 
   // Ket qua sau khi nhan Dang
   postResult: {
@@ -144,7 +182,11 @@ module.exports = {
     ],
     publishedLink: [
       'a[href*="/groups/"][href*="/posts/"]',
-      'a[href*="/groups/"][href*="/permalink/"]'
+      'a[href*="/groups/"][href*="/permalink/"]',
+      'a[href*="/posts/"]',
+      'a[href*="/videos/"]',
+      'a[href*="/permalink.php"]',
+      'a[href*="/watch/"]'
     ],
     genericError: [
       'text=/không thể đăng bài viết này/i',

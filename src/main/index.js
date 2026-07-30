@@ -162,7 +162,7 @@ function registerIpcHandlers() {
       const status = await postAutomation.recheckJobStatus({
         page,
         facebookPostUrl: job.facebook_post_url,
-        groupUrl: job.group_url,
+        targetUrl: job.target_url,
         screenshotDir: path.join(getDataDir(), 'screenshots'),
         log: (level, message) => logService.addLog(jobId, level, message)
       })
@@ -172,11 +172,19 @@ function registerIpcHandlers() {
     }
   })
 
-  // --- Anh dinh kem ---
+  // --- Anh/video dinh kem ---
   handle('media:pickImages', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Hình ảnh', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }]
+    })
+    if (result.canceled) return []
+    return result.filePaths
+  })
+  handle('media:pickVideos', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Video', extensions: ['mp4', 'mov', 'avi', 'mkv', 'webm'] }]
     })
     if (result.canceled) return []
     return result.filePaths

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { toast } from '../lib/toast.js'
 import StatusBadge from './StatusBadge.jsx'
-import { ALL_JOB_STATUSES, JOB_STATUS_LABEL_VI } from '../constants/statusMap'
+import { ALL_JOB_STATUSES, JOB_STATUS_LABEL_VI, TARGET_TYPE_LABEL_VI } from '../constants/statusMap'
 
 export default function HistoryView({ title, description, initialStatus = '' }) {
   const [rows, setRows] = useState([])
@@ -147,7 +147,7 @@ export default function HistoryView({ title, description, initialStatus = '' }) 
           </select>
         </div>
         <div className="field">
-          <label>Nhóm</label>
+          <label>Nhóm (chỉ áp dụng cho đích loại Nhóm)</label>
           <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
             <option value="">Tất cả</option>
             {groups.map((g) => <option key={g.id} value={g.id}>{g.group_name}</option>)}
@@ -177,7 +177,7 @@ export default function HistoryView({ title, description, initialStatus = '' }) 
             <tr>
               <th>Chiến dịch</th>
               <th>Tài khoản</th>
-              <th>Nhóm</th>
+              <th>Đích đăng</th>
               <th>Nội dung</th>
               <th>Bắt đầu</th>
               <th>Đăng lúc</th>
@@ -195,7 +195,10 @@ export default function HistoryView({ title, description, initialStatus = '' }) 
               <tr key={job.id}>
                 <td>{job.campaign_name}</td>
                 <td>{job.account_name}</td>
-                <td>{job.group_name}</td>
+                <td>
+                  <span className="badge badge-blue" style={{ marginRight: 6 }}>{TARGET_TYPE_LABEL_VI[job.target_type] || job.target_type}</span>
+                  {job.target_name}
+                </td>
                 <td style={{ maxWidth: 220 }}>
                   <span title={job.content}>{job.content?.slice(0, 60)}{job.content?.length > 60 ? '…' : ''}</span>
                 </td>
@@ -229,7 +232,7 @@ export default function HistoryView({ title, description, initialStatus = '' }) 
             </div>
             <p><strong>Chiến dịch:</strong> {detailJob.campaign_name}</p>
             <p><strong>Tài khoản:</strong> {detailJob.account_name}</p>
-            <p><strong>Nhóm:</strong> {detailJob.group_name} ({detailJob.group_url})</p>
+            <p><strong>Đích đăng:</strong> {TARGET_TYPE_LABEL_VI[detailJob.target_type] || detailJob.target_type} — {detailJob.target_name} ({detailJob.target_url})</p>
             <p><strong>Trạng thái:</strong> <StatusBadge status={detailJob.status} /></p>
             <p><strong>Nội dung:</strong></p>
             <div className="card" style={{ whiteSpace: 'pre-wrap', background: '#fafbfd' }}>{detailJob.content}</div>

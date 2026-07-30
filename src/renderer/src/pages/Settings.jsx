@@ -5,6 +5,7 @@ const FIELDS = [
   { key: 'delay_between_posts_seconds', label: 'Thời gian chờ giữa hai bài đăng (giây)', type: 'number' },
   { key: 'page_load_timeout_ms', label: 'Thời gian chờ tải trang (ms)', type: 'number' },
   { key: 'media_upload_timeout_ms', label: 'Thời gian chờ tải ảnh (ms)', type: 'number' },
+  { key: 'video_processing_timeout_ms', label: 'Thời gian chờ Facebook xử lý video (ms)', type: 'number' },
   { key: 'max_retry_count', label: 'Số lần thử lại khi lỗi', type: 'number' },
   { key: 'daily_post_limit_per_account', label: 'Giới hạn bài đăng mỗi tài khoản/ngày', type: 'number' },
   { key: 'recheck_interval_minutes', label: 'Thời gian giữa các lần tự kiểm tra trạng thái (phút)', type: 'number' },

@@ -1,5 +1,6 @@
 const { getDb } = require('../db/database')
 const { canAccountPostToGroup } = require('./accountGroupService')
+const accountService = require('./accountService')
 const { JOB_STATUS } = require('../automation/statusCodes')
 
 function nowIso() {
@@ -20,7 +21,7 @@ function validateCampaignPayload(payload) {
     errors.push('Chưa chọn tài khoản Facebook nào.')
   }
   if (selections.length === 0) {
-    errors.push('Chưa chọn nhóm nào để đăng.')
+    errors.push('Chưa chọn nơi đăng nào (nhóm / trang cá nhân / fanpage).')
   }
   return errors
 }
@@ -30,7 +31,7 @@ function validateCampaignPayload(payload) {
  * payload: {
  *   campaign_name, content, dry_run, delay_seconds,
  *   media: [{ file_path, file_type }],
- *   selections: [{ account_id, group_id }]
+ *   selections: [{ account_id, target_type: 'GROUP'|'TIMELINE'|'PAGE', group_id? }]
  * }
  */
 function createCampaign(payload) {
@@ -51,8 +52,8 @@ function createCampaign(payload) {
     VALUES (@post_id, @file_path, @file_type, @sort_order)
   `)
   const insertJob = db.prepare(`
-    INSERT INTO post_jobs (post_id, account_id, group_id, status, error_code, error_message)
-    VALUES (@post_id, @account_id, @group_id, @status, @error_code, @error_message)
+    INSERT INTO post_jobs (post_id, account_id, target_type, group_id, status, error_code, error_message)
+    VALUES (@post_id, @account_id, @target_type, @group_id, @status, @error_code, @error_message)
   `)
 
   const tx = db.transaction(() => {
@@ -69,15 +70,42 @@ function createCampaign(payload) {
     })
 
     payload.selections.forEach((sel) => {
-      // Khong cho phep tao job neu tai khoan chua tham gia nhom (muc 4)
-      const allowed = canAccountPostToGroup(sel.account_id, sel.group_id)
+      const targetType = sel.target_type || 'GROUP'
+      let allowed = true
+      let errorCode = null
+      let errorMessage = null
+
+      if (targetType === 'GROUP') {
+        // Khong cho phep tao job neu tai khoan chua tham gia nhom (muc 4)
+        allowed = canAccountPostToGroup(sel.account_id, sel.group_id)
+        if (!allowed) {
+          errorCode = 'ACCOUNT_NOT_MEMBER'
+          errorMessage = 'Tài khoản chưa tham gia nhóm này.'
+        }
+      } else if (targetType === 'PAGE') {
+        const account = accountService.get(sel.account_id)
+        allowed = !!account?.fanpage_url
+        if (!allowed) {
+          errorCode = 'PAGE_URL_NOT_SET'
+          errorMessage = 'Tài khoản chưa gắn URL Fanpage. Vào "Tài khoản Facebook" để thêm.'
+        }
+      }
+      // TIMELINE: luon cho phep, khong can kiem tra gi them.
+
+      const initialStatus = allowed
+        ? JOB_STATUS.QUEUED
+        : targetType === 'PAGE'
+          ? JOB_STATUS.TARGET_NOT_CONFIGURED
+          : JOB_STATUS.NOT_A_MEMBER
+
       insertJob.run({
         post_id: postId,
         account_id: sel.account_id,
-        group_id: sel.group_id,
-        status: allowed ? JOB_STATUS.QUEUED : JOB_STATUS.NOT_A_MEMBER,
-        error_code: allowed ? null : 'ACCOUNT_NOT_MEMBER',
-        error_message: allowed ? null : 'Tài khoản chưa tham gia nhóm này.'
+        target_type: targetType,
+        group_id: targetType === 'GROUP' ? sel.group_id : null,
+        status: initialStatus,
+        error_code: errorCode,
+        error_message: errorMessage
       })
     })
 
@@ -94,10 +122,20 @@ function getCampaign(postId) {
   if (!post) return null
   const media = db.prepare('SELECT * FROM post_media WHERE post_id = ? ORDER BY sort_order ASC').all(postId)
   const jobs = db.prepare(`
-    SELECT pj.*, a.display_name AS account_name, g.group_name, g.group_url
+    SELECT pj.*, a.display_name AS account_name, g.group_name, g.group_url,
+      CASE pj.target_type
+        WHEN 'GROUP' THEN g.group_name
+        WHEN 'TIMELINE' THEN 'Trang cá nhân'
+        WHEN 'PAGE' THEN 'Fanpage'
+      END AS target_name,
+      CASE pj.target_type
+        WHEN 'GROUP' THEN g.group_url
+        WHEN 'TIMELINE' THEN 'https://www.facebook.com/'
+        WHEN 'PAGE' THEN a.fanpage_url
+      END AS target_url
     FROM post_jobs pj
     JOIN facebook_accounts a ON a.id = pj.account_id
-    JOIN facebook_groups g ON g.id = pj.group_id
+    LEFT JOIN facebook_groups g ON g.id = pj.group_id
     WHERE pj.post_id = ?
     ORDER BY a.id ASC, pj.id ASC
   `).all(postId)
@@ -150,11 +188,21 @@ function listJobs(filters = {}) {
   return db.prepare(`
     SELECT pj.*, p.campaign_name, p.content, p.dry_run,
            a.display_name AS account_name,
-           g.group_name, g.group_url
+           g.group_name, g.group_url,
+      CASE pj.target_type
+        WHEN 'GROUP' THEN g.group_name
+        WHEN 'TIMELINE' THEN 'Trang cá nhân'
+        WHEN 'PAGE' THEN 'Fanpage'
+      END AS target_name,
+      CASE pj.target_type
+        WHEN 'GROUP' THEN g.group_url
+        WHEN 'TIMELINE' THEN 'https://www.facebook.com/'
+        WHEN 'PAGE' THEN a.fanpage_url
+      END AS target_url
     FROM post_jobs pj
     JOIN posts p ON p.id = pj.post_id
     JOIN facebook_accounts a ON a.id = pj.account_id
-    JOIN facebook_groups g ON g.id = pj.group_id
+    LEFT JOIN facebook_groups g ON g.id = pj.group_id
     ${where}
     ORDER BY pj.id DESC
   `).all(params)
@@ -238,7 +286,7 @@ function deleteJob(jobId) {
 
 function toCsv(rows) {
   const headers = [
-    'campaign_name', 'account_name', 'group_name', 'group_url', 'status',
+    'campaign_name', 'account_name', 'target_type', 'target_name', 'target_url', 'status',
     'facebook_post_url', 'posted_at', 'error_code', 'error_message', 'created_at'
   ]
   const escape = (v) => {

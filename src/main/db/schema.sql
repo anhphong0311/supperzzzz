@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS facebook_accounts (
   last_posted_at TEXT,
   last_checked_at TEXT,
   notes TEXT,
+  fanpage_url TEXT, -- URL Fanpage duy nhat cua tai khoan nay (tuy chon, dung khi dang len Fanpage)
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -68,7 +69,8 @@ CREATE TABLE IF NOT EXISTS post_jobs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   account_id INTEGER NOT NULL REFERENCES facebook_accounts(id),
-  group_id INTEGER NOT NULL REFERENCES facebook_groups(id),
+  target_type TEXT NOT NULL DEFAULT 'GROUP', -- 'GROUP' | 'TIMELINE' (trang ca nhan) | 'PAGE' (fanpage)
+  group_id INTEGER REFERENCES facebook_groups(id), -- chi dung khi target_type = 'GROUP'
   status TEXT NOT NULL DEFAULT 'CHUA_XU_LY',
   facebook_post_url TEXT,
   posted_at TEXT,

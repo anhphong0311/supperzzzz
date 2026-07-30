@@ -31,17 +31,19 @@ class JobExecutionError extends Error {
 }
 
 /**
- * Thuc hien 1 job dang bai vao 1 nhom (muc 9, cac buoc 2-14).
- * Buoc 1 (mo dung Chrome Profile) va buoc 15 (dong tab/chuyen nhom) do
- * queue engine dam nhiem vi context/page duoc tai su dung giua cac job cua
- * cung mot tai khoan.
+ * Thuc hien 1 job dang bai vao 1 dich (Nhom / Trang ca nhan / Fanpage), muc
+ * 9 cac buoc 2-14. Buoc 1 (mo dung Chrome Profile) va buoc 15 (dong
+ * tab/chuyen dich) do queue engine dam nhiem vi context/page duoc tai su
+ * dung giua cac job cua cung mot tai khoan.
  *
+ * @param {{type: 'GROUP'|'TIMELINE'|'PAGE', url: string, name: string}} target
  * @returns {{ status: string, facebookPostUrl: string|null, screenshotPath: string|null }}
  */
-async function executeJob({ page, groupUrl, content, mediaPaths = [], dryRun, timeouts, screenshotDir, log }) {
+async function executeJob({ page, target, content, mediaPaths = [], dryRun, timeouts, screenshotDir, log }) {
   const T = {
     pageLoad: timeouts?.pageLoadMs ?? 30000,
-    mediaUpload: timeouts?.mediaUploadMs ?? 60000
+    mediaUpload: timeouts?.mediaUploadMs ?? 60000,
+    videoProcessing: timeouts?.videoProcessingMs ?? 90000
   }
 
   const captureFailureScreenshot = async (prefix) => {
@@ -65,15 +67,15 @@ async function executeJob({ page, groupUrl, content, mediaPaths = [], dryRun, ti
     }
   }
 
-  // Buoc 2: Truy cap URL nhom
-  log('INFO', `Đang truy cập nhóm: ${groupUrl}`)
+  // Buoc 2: Truy cap URL dich (nhom / trang chu / fanpage)
+  log('INFO', `Đang truy cập ${target.name}: ${target.url}`)
   try {
-    await page.goto(groupUrl, { waitUntil: 'domcontentloaded', timeout: T.pageLoad })
+    await page.goto(target.url, { waitUntil: 'domcontentloaded', timeout: T.pageLoad })
   } catch (err) {
-    await fail(ERROR_CODES.NETWORK_ERROR, `Không tải được trang nhóm: ${err.message}`)
+    await fail(ERROR_CODES.NETWORK_ERROR, `Không tải được trang: ${err.message}`)
   }
   await page.waitForTimeout(1500)
-  await assertNoManualInterventionNeeded('mở nhóm')
+  await assertNoManualInterventionNeeded('mở trang đích')
 
   // Buoc 4: Kiem tra con dang nhap hay khong
   const loggedOut = await existsAny(page, selectors.loginIndicators.loggedOut, { timeout: 1000 })
@@ -81,21 +83,24 @@ async function executeJob({ page, groupUrl, content, mediaPaths = [], dryRun, ti
     throw new ManualInterventionError(ERROR_CODES.LOGIN_SESSION_EXPIRED, 'Phiên đăng nhập đã hết hạn.')
   }
 
-  // Buoc 3: Kiem tra co the xem/dang bai trong nhom hay khong
-  const unavailable = await existsAny(page, selectors.groupAccessIndicators.unavailable, { timeout: 1000 })
-  if (unavailable) {
-    return {
-      status: JOB_STATUS.GROUP_UNAVAILABLE,
-      facebookPostUrl: null,
-      screenshotPath: await captureFailureScreenshot('group-unavailable')
+  // Buoc 3: Kiem tra co the xem/dang bai trong nhom hay khong (chi ap dung
+  // cho target_type = 'GROUP' - Trang ca nhan/Fanpage khong can kiem tra nay)
+  if (target.type === 'GROUP') {
+    const unavailable = await existsAny(page, selectors.groupAccessIndicators.unavailable, { timeout: 1000 })
+    if (unavailable) {
+      return {
+        status: JOB_STATUS.GROUP_UNAVAILABLE,
+        facebookPostUrl: null,
+        screenshotPath: await captureFailureScreenshot('group-unavailable')
+      }
     }
-  }
-  const notMember = await existsAny(page, selectors.groupAccessIndicators.notAMember, { timeout: 1000 })
-  if (notMember) {
-    return {
-      status: JOB_STATUS.NOT_A_MEMBER,
-      facebookPostUrl: null,
-      screenshotPath: await captureFailureScreenshot('not-a-member')
+    const notMember = await existsAny(page, selectors.groupAccessIndicators.notAMember, { timeout: 1000 })
+    if (notMember) {
+      return {
+        status: JOB_STATUS.NOT_A_MEMBER,
+        facebookPostUrl: null,
+        screenshotPath: await captureFailureScreenshot('not-a-member')
+      }
     }
   }
 
@@ -113,6 +118,20 @@ async function executeJob({ page, groupUrl, content, mediaPaths = [], dryRun, ti
   }
   await assertNoManualInterventionNeeded('mở cửa sổ tạo bài viết')
 
+  // Rieng Fanpage: co gang chuyen danh tinh dang bai sang Trang (BEST-EFFORT
+  // - xem ghi chu trong selectors.js). Neu khong tim thay nut nay, bo qua va
+  // dang tiep voi danh tinh mac dinh Facebook dang hien thi.
+  if (target.type === 'PAGE') {
+    const switchBtn = await findFirst(page, selectors.pageIdentitySwitch, { timeoutPerCandidate: 1500 })
+    if (switchBtn) {
+      log('INFO', 'Đang chuyển sang đăng bài với tư cách Fanpage...')
+      await switchBtn.click().catch(() => {})
+      await page.waitForTimeout(800)
+    } else {
+      log('INFO', 'Không tìm thấy nút chuyển danh tính Fanpage - tiếp tục với danh tính hiện tại. Hãy kiểm tra kỹ bằng DRY_RUN.')
+    }
+  }
+
   // Buoc 7: Dien noi dung
   log('INFO', 'Đang điền nội dung...')
   const editable = await findFirst(page, selectors.composer.contentEditable, { timeoutPerCandidate: 5000 })
@@ -122,9 +141,9 @@ async function executeJob({ page, groupUrl, content, mediaPaths = [], dryRun, ti
   await editable.click()
   await page.keyboard.type(content, { delay: 8 })
 
-  // Buoc 8-9: Tai anh len va cho hoan tat
+  // Buoc 8-9: Tai anh/video len va cho hoan tat
   if (mediaPaths.length > 0) {
-    log('INFO', `Đang tải lên ${mediaPaths.length} ảnh...`)
+    log('INFO', `Đang tải lên ${mediaPaths.length} tệp ảnh/video...`)
     // input[type=file] cua Facebook bi an bang CSS (nguoi dung thay khong
     // bam thang vao no ma bam nut "Anh/video" hien thi ben ngoai) nen phai
     // tim voi state:'attached' - neu doi 'visible' se KHONG BAO GIO tim
@@ -132,14 +151,35 @@ async function executeJob({ page, groupUrl, content, mediaPaths = [], dryRun, ti
     // "Khong tim thay nut/o tai anh len" du giao dien co hien nut do).
     const fileInput = await findFirst(page, selectors.composer.fileInput, { timeoutPerCandidate: 4000, state: 'attached' })
     if (!fileInput) {
-      await fail(ERROR_CODES.MEDIA_UPLOAD_FAILED, 'Không tìm thấy nút/ô tải ảnh lên.', 'media-upload-failed')
+      await fail(ERROR_CODES.MEDIA_UPLOAD_FAILED, 'Không tìm thấy nút/ô tải ảnh/video lên.', 'media-upload-failed')
     }
     try {
       await fileInput.setInputFiles(mediaPaths)
       await page.waitForTimeout(1000)
-      await findFirst(page, selectors.composer.imageThumbnail, { timeoutPerCandidate: T.mediaUpload })
+      // Thumbnail co the la <img> (anh) hoac <video> (video) - thu ca 2.
+      const thumbnail = await findFirst(
+        page,
+        [...selectors.composer.imageThumbnail, ...selectors.composer.videoThumbnail],
+        { timeoutPerCandidate: T.mediaUpload }
+      )
+      if (!thumbnail) {
+        await fail(ERROR_CODES.MEDIA_UPLOAD_FAILED, 'Không thấy ảnh/video hiển thị sau khi tải lên.', 'media-upload-failed')
+      }
+
+      // Video can Facebook xu ly (encode) truoc khi dang duoc - PHAI cho
+      // thanh tien trinh/spinner bien mat, neu khong video co the bi dang
+      // thieu hoac loi. Kiem tra dinh ky den khi het T.videoProcessing.
+      const processingDeadline = Date.now() + T.videoProcessing
+      while (await existsAny(page, selectors.composer.mediaProcessingIndicator, { timeout: 1000 })) {
+        if (Date.now() > processingDeadline) {
+          await fail(ERROR_CODES.MEDIA_UPLOAD_FAILED, 'Video xử lý quá lâu (quá thời gian chờ), có thể do video dài hoặc mạng chậm.', 'media-processing-timeout')
+        }
+        log('INFO', 'Đang chờ Facebook xử lý video...')
+        await page.waitForTimeout(2000)
+      }
     } catch (err) {
-      await fail(ERROR_CODES.MEDIA_UPLOAD_FAILED, `Tải ảnh lên thất bại: ${err.message}`, 'media-upload-failed')
+      if (err instanceof JobExecutionError) throw err
+      await fail(ERROR_CODES.MEDIA_UPLOAD_FAILED, `Tải ảnh/video lên thất bại: ${err.message}`, 'media-upload-failed')
     }
   }
 
@@ -201,10 +241,10 @@ async function executeJob({ page, groupUrl, content, mediaPaths = [], dryRun, ti
  * nhom - ket qua duoc suy ra tu giao dien hien thi va co the khong chinh
  * xac tuyet doi.
  */
-async function recheckJobStatus({ page, facebookPostUrl, groupUrl, screenshotDir, log }) {
-  const target = facebookPostUrl || groupUrl
+async function recheckJobStatus({ page, facebookPostUrl, targetUrl, screenshotDir, log }) {
+  const urlToOpen = facebookPostUrl || targetUrl
   try {
-    await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 })
+    await page.goto(urlToOpen, { waitUntil: 'domcontentloaded', timeout: 30000 })
     await page.waitForTimeout(1500)
 
     if (await existsAny(page, selectors.checkpointIndicators, { timeout: 800 })) {

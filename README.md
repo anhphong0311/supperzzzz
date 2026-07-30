@@ -1,14 +1,18 @@
 # FB Multi Poster (MVP)
 
-Công cụ desktop hỗ trợ soạn **một** bài viết và đăng tuần tự lên **nhiều nhóm Facebook**
-bằng **2–3 tài khoản Facebook** do bạn sở hữu/được phép quản lý, mỗi tài khoản dùng một
-Chrome Profile (phiên đăng nhập) riêng biệt.
+Công cụ desktop hỗ trợ soạn **một** bài viết (kèm ảnh và/hoặc video) và đăng tuần tự lên
+**nhiều Nhóm Facebook, Trang cá nhân, và Fanpage** bằng **2–3 tài khoản Facebook** do bạn
+sở hữu/được phép quản lý, mỗi tài khoản dùng một Chrome Profile (phiên đăng nhập) riêng biệt.
 
 > ⚠️ **Đọc trước khi dùng — giới hạn & rủi ro**
-> - Facebook không cung cấp API chính thức để đăng bài vào Groups theo cách này. Tool
->   dùng browser automation (Playwright) mô phỏng thao tác người dùng thật, dựa trên các
->   selector CSS/DOM hiện tại của giao diện Facebook — **selector này có thể lỗi thời bất
->   cứ lúc nào** khi Facebook đổi giao diện.
+> - Facebook không cung cấp API chính thức để đăng bài theo cách này. Tool dùng browser
+>   automation (Playwright) mô phỏng thao tác người dùng thật, dựa trên các selector
+>   CSS/DOM hiện tại của giao diện Facebook — **selector này có thể lỗi thời bất cứ lúc
+>   nào** khi Facebook đổi giao diện.
+> - Đăng "với tư cách Fanpage" phụ thuộc vào nút chuyển danh tính mà Facebook hiển thị khi
+>   mở đúng Fanpage bạn quản trị — đây là selector **dễ lỗi thời nhất** trong tool. Nếu
+>   không tìm thấy nút này, tool sẽ đăng tiếp với danh tính hiện tại thay vì dừng lại, nên
+>   **luôn kiểm tra bằng DRY_RUN trước** khi đăng thật lên Fanpage.
 > - Chỉ dùng với tài khoản/nhóm bạn **sở hữu hoặc được phép quản lý**. Đăng nội dung trùng
 >   lặp hàng loạt vẫn có thể bị Facebook coi là spam và hạn chế/khoá tài khoản — tool có
 >   giới hạn số bài/ngày và độ trễ giữa các lần đăng để giảm rủi ro, nhưng **không thể đảm
@@ -47,10 +51,10 @@ src/
       selectors.js             # !! KHO SELECTOR FACEBOOK TẬP TRUNG - xem mục 6 !!
       domHelper.js              # Helper thử nhiều selector dự phòng
       browserManager.js          # Mở đúng Chrome Profile, kiểm tra đăng nhập/truy cập nhóm
-      postAutomation.js          # Luồng 15 bước đăng 1 bài vào 1 nhóm + DRY_RUN
+      postAutomation.js          # Luồng 15 bước đăng 1 bài vào 1 đích (Nhóm/Trang cá nhân/Fanpage) + DRY_RUN
       statusCodes.js              # Enum trạng thái & mã lỗi dùng chung
     queue/
-      postQueue.js               # Hàng đợi xử lý tuần tự theo tài khoản -> nhóm
+      postQueue.js               # Hàng đợi xử lý tuần tự theo tài khoản -> đích đăng
   preload/
     index.js                  # contextBridge - expose window.api an toàn cho renderer
   renderer/
@@ -123,7 +127,7 @@ không cần mở terminal.
 Tool **không bao giờ** lưu email/mật khẩu Facebook — chỉ dựa vào cookie/session đã có sẵn
 trong thư mục Chrome Profile mà bạn tự đăng nhập.
 
-## 5. Gán tài khoản vào nhóm
+## 5. Gán tài khoản vào nhóm / Fanpage
 
 Vào **Danh sách nhóm** → **+ Thêm nhóm** (dán 1 hoặc nhiều URL nhóm, mỗi dòng một URL) →
 với mỗi nhóm, bấm **Gán tài khoản** và tick chọn đúng những tài khoản **thật sự đã là
@@ -132,6 +136,11 @@ gia nhóm bằng Facebook thật trước, rồi mới đánh dấu trong tool.
 
 Nút **Kiểm tra truy cập** sẽ mở nhóm bằng một tài khoản cụ thể để xác nhận tài khoản đó
 có xem/đăng bài được trong nhóm hay không, và tự cập nhật trạng thái.
+
+**Fanpage**: mỗi tài khoản chỉ gắn được đúng **một** Fanpage — nhập URL Fanpage ở màn hình
+**Tài khoản Facebook** (field "Fanpage URL"), với điều kiện tài khoản đó là quản trị viên
+của Fanpage đó. Không cần bước gán riêng như Nhóm. **Trang cá nhân** thì luôn khả dụng
+cho mọi tài khoản, không cần cấu hình gì thêm.
 
 ## 6. Chạy thử DRY_RUN (bắt buộc trước khi đăng thật)
 
@@ -149,12 +158,14 @@ trước khi tắt DRY_RUN để đăng thật.
 ## 7. Đăng bài thật
 
 1. Tắt DRY_RUN ở màn hình Tạo bài đăng.
-2. Nhập nội dung, chọn ảnh (nếu có), chọn tài khoản, chọn nhóm tương ứng cho từng tài
-   khoản (chỉ nhóm mà tài khoản đó đã được gán ở bước 5 mới chọn được).
+2. Nhập nội dung, chọn ảnh/video (nếu có), chọn tài khoản, sau đó với mỗi tài khoản chọn
+   đích đăng: Trang cá nhân / Fanpage (nếu đã gắn) / các Nhóm tương ứng (chỉ nhóm mà tài
+   khoản đó đã được gán ở bước 5 mới chọn được) — có thể chọn nhiều loại cùng lúc cho cùng
+   một tài khoản.
 3. Thiết lập thời gian chờ giữa hai lần đăng (giây) — nên để tối thiểu vài chục giây,
    tránh đăng dồn dập.
-4. Bấm **Đăng bài**. Tool xử lý **tuần tự**: xong toàn bộ nhóm của tài khoản 1 rồi mới
-   sang tài khoản 2, v.v. Theo dõi tiến trình + nhật ký thời gian thực ngay trong màn
+4. Bấm **Đăng bài**. Tool xử lý **tuần tự**: xong toàn bộ đích đăng của tài khoản 1 rồi
+   mới sang tài khoản 2, v.v. Theo dõi tiến trình + nhật ký thời gian thực ngay trong màn
    hình. Có thể **Tạm dừng / Tiếp tục / Dừng** bất cứ lúc nào.
 5. Nếu gặp CAPTCHA / checkpoint / yêu cầu xác minh / hết phiên đăng nhập, **toàn bộ hàng
    đợi tự dừng** — mở đúng Chrome Profile của tài khoản đó (nút "Mở để đăng nhập" ở màn
@@ -186,8 +197,9 @@ Khi tool báo lỗi `FACEBOOK_LAYOUT_CHANGED` / `POST_COMPOSER_NOT_FOUND` / tư�
 | `CHECKPOINT_DETECTED` / `CAPTCHA_DETECTED` | Facebook yêu cầu xác minh — cần xử lý thủ công |
 | `GROUP_NOT_FOUND` / `GROUP_ACCESS_DENIED` | Không truy cập được nhóm |
 | `ACCOUNT_NOT_MEMBER` | Tài khoản chưa tham gia nhóm |
+| `TARGET_NOT_CONFIGURED` / `PAGE_URL_NOT_SET` | Đã chọn đăng lên Fanpage nhưng tài khoản chưa gắn Fanpage URL |
 | `POST_COMPOSER_NOT_FOUND` / `CONTENT_INPUT_FAILED` / `SUBMIT_BUTTON_NOT_FOUND` | Không tìm thấy phần tử trên giao diện — khả năng cao do Facebook đổi giao diện, xem mục 8 |
-| `MEDIA_UPLOAD_FAILED` | Tải ảnh lên thất bại |
+| `MEDIA_UPLOAD_FAILED` | Tải ảnh/video lên thất bại, hoặc video xử lý quá lâu (quá thời gian chờ) |
 | `POST_SUBMIT_FAILED` | Facebook từ chối/báo lỗi khi đăng |
 | `PENDING_STATUS_NOT_DETECTED` / `POST_URL_NOT_FOUND` | Không xác định được kết quả sau khi đăng |
 | `FACEBOOK_LAYOUT_CHANGED` | Giao diện Facebook thay đổi khiến tool không nhận diện được |
@@ -215,4 +227,7 @@ khoá `"build"` trong `package.json`). Có thể chỉnh `appId`, `productName`,
   đúng yêu cầu bản đầu tiên).
 - Tự động kiểm tra lại bài chờ duyệt theo lịch (`auto_recheck_pending`) mới có cấu hình,
   chưa có bộ lập lịch chạy nền — hiện tại phải bấm "Kiểm tra lại" thủ công trong Lịch sử.
-- Selector Facebook có thể lỗi thời theo thời gian — xem mục 8 để tự cập nhật.
+- Selector Facebook có thể lỗi thời theo thời gian — xem mục 8 để tự cập nhật. Selector cho
+  bước chuyển danh tính sang Fanpage là selector **dễ lỗi thời nhất**.
+- Mỗi tài khoản chỉ gắn được **một** Fanpage (không hỗ trợ nhiều Fanpage/tài khoản như
+  Nhóm) — đủ dùng cho quy mô cá nhân/hộ kinh doanh nhỏ của bản MVP này.
