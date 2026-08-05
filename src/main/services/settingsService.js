@@ -15,7 +15,12 @@ const DEFAULTS = {
   recheck_interval_minutes: '60',
   daily_post_limit_per_account: '20',
   notifications_enabled: 'true',
-  dry_run_default: 'true'
+  dry_run_default: 'true',
+  // Giai doan 1 - tich hop Google Sheets (kho video)
+  google_service_account_key_path: '',
+  google_sheet_id: '',
+  google_sheet_tab_name: 'Sheet1',
+  video_download_timeout_ms: '300000'
 }
 
 function nowIso() {

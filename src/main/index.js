@@ -7,10 +7,19 @@ const groupService = require('./services/groupService')
 const accountGroupService = require('./services/accountGroupService')
 const postService = require('./services/postService')
 const settingsService = require('./services/settingsService')
+const authService = require('./services/authService')
+const staffService = require('./services/staffService')
 const logService = require('./services/logService')
+const videoLibraryService = require('./services/videoLibraryService')
+const scheduleService = require('./services/scheduleService')
 const browserManager = require('./automation/browserManager')
 const postAutomation = require('./automation/postAutomation')
+const instagramAutomation = require('./automation/instagramAutomation')
+const tiktokAutomation = require('./automation/tiktokAutomation')
 const postQueue = require('./queue/postQueue')
+const schedulerEngine = require('./scheduler/schedulerEngine')
+const notifier = require('./notifier')
+const updater = require('./updater')
 const { initDb, getDataDir } = require('./db/database')
 
 let mainWindow = null
@@ -48,8 +57,15 @@ function registerQueueEventForwarding() {
   postQueue.on('progress', (data) => sendToRenderer('queue:progress', data))
   postQueue.on('log', (data) => sendToRenderer('queue:log', data))
   postQueue.on('state-changed', (data) => sendToRenderer('queue:state-changed', data))
-  postQueue.on('manual-intervention', (data) => sendToRenderer('queue:manual-intervention', data))
+  postQueue.on('manual-intervention', (data) => {
+    sendToRenderer('queue:manual-intervention', data)
+    notifier.notify('FB Multi Poster - Cần xử lý thủ công', data.message)
+  })
   postQueue.on('campaign-finished', (data) => sendToRenderer('queue:campaign-finished', data))
+
+  schedulerEngine.on('log', (data) => sendToRenderer('scheduler:log', data))
+  schedulerEngine.on('fire-start', (data) => sendToRenderer('scheduler:fire-start', data))
+  schedulerEngine.on('fired', (data) => sendToRenderer('scheduler:fired', data))
 }
 
 function handle(channel, fn) {
@@ -159,9 +175,10 @@ function registerIpcHandlers() {
     const context = await browserManager.launchProfile(account.browser_profile_path, { headless })
     try {
       const page = context.pages()[0] || (await context.newPage())
-      const status = await postAutomation.recheckJobStatus({
+      const automation = job.platform === 'instagram' ? instagramAutomation : job.platform === 'tiktok' ? tiktokAutomation : postAutomation
+      const status = await automation.recheckJobStatus({
         page,
-        facebookPostUrl: job.facebook_post_url,
+        postUrl: job.post_url,
         targetUrl: job.target_url,
         screenshotDir: path.join(getDataDir(), 'screenshots'),
         log: (level, message) => logService.addLog(jobId, level, message)
@@ -190,9 +207,54 @@ function registerIpcHandlers() {
     return result.filePaths
   })
 
+  // --- Dang nhap / phan quyen ---
+  handle('auth:hasAdminPassword', () => authService.hasAdminPassword())
+  handle('auth:loginStaff', (username, password) => staffService.login(username, password))
+  handle('auth:loginAdmin', (password) => authService.loginAdmin(password))
+  handle('auth:setAdminPassword', (currentPassword, newPassword) => authService.setAdminPassword(currentPassword, newPassword))
+  handle('auth:registerStaff', (data) => staffService.register(data))
+
+  // --- Tai khoan Nhan vien ---
+  handle('staff:list', () => staffService.list())
+  handle('staff:create', (data) => staffService.create(data))
+  handle('staff:update', (id, data) => staffService.update(id, data))
+  handle('staff:setStatus', (id, status) => staffService.setStatus(id, status))
+  handle('staff:setRole', (id, role) => staffService.setRole(id, role))
+  handle('staff:approve', (id) => staffService.approve(id))
+  handle('staff:markWizardDone', (id) => staffService.markWizardDone(id))
+  handle('staff:resetPassword', (id, newPassword) => staffService.resetPassword(id, newPassword))
+  handle('staff:remove', (id) => staffService.remove(id))
+
   // --- Cai dat ---
   handle('settings:getAll', () => settingsService.getAll())
   handle('settings:setMany', (entries) => settingsService.setMany(entries))
+  handle('settings:pickServiceAccountKeyFile', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    return result.filePaths[0]
+  })
+
+  // --- Kho video (Google Sheets + Drive) ---
+  handle('videoLibrary:list', () => videoLibraryService.list())
+  handle('videoLibrary:testConnection', () => videoLibraryService.testConnection())
+  handle('videoLibrary:sync', () => videoLibraryService.syncFromSheet())
+  handle('videoLibrary:download', (id) => videoLibraryService.downloadVideo(id))
+  handle('videoLibrary:writeBackToSheet', (id) => videoLibraryService.writeBackToSheet(id))
+  handle('videoLibrary:markPlatformResult', (id, platform, result) => videoLibraryService.markPlatformResult(id, platform, result))
+  handle('videoLibrary:remove', (id) => videoLibraryService.remove(id))
+
+  // --- Lich dang tu dong ---
+  handle('schedules:list', () => scheduleService.list())
+  handle('schedules:get', (id) => scheduleService.get(id))
+  handle('schedules:create', (payload) => scheduleService.create(payload))
+  handle('schedules:setTargets', (id, targets) => scheduleService.setTargets(id, targets))
+  handle('schedules:setEnabled', (id, enabled) => scheduleService.setEnabled(id, enabled))
+  handle('schedules:update', (id, data) => scheduleService.update(id, data))
+  handle('schedules:remove', (id) => scheduleService.remove(id))
+  handle('schedules:runNow', (id) => schedulerEngine.runNow(id))
 
   // --- Nhat ky ---
   handle('logs:listForJob', (jobId) => logService.listForJob(jobId))
@@ -212,9 +274,17 @@ function registerIpcHandlers() {
 
 app.whenReady().then(async () => {
   await initDb()
+  accountService.resetDailyCountersIfNewDay()
   registerIpcHandlers()
   registerQueueEventForwarding()
   createWindow()
+  schedulerEngine.start()
+
+  // Kiem tra cap nhat qua GitHub Releases - chi khi da dong goi thuc su (bo
+  // qua khi chay electron-vite dev/preview, vi latest.yml chi ton tai o ban build).
+  if (app.isPackaged) {
+    updater.init(mainWindow)
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -222,5 +292,6 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
+  schedulerEngine.stop()
   if (process.platform !== 'darwin') app.quit()
 })

@@ -6,7 +6,10 @@ const accountService = require('../services/accountService')
 const settingsService = require('../services/settingsService')
 const logService = require('../services/logService')
 const { launchProfile } = require('../automation/browserManager')
-const { executeJob, ManualInterventionError, JobExecutionError } = require('../automation/postAutomation')
+const facebookAutomation = require('../automation/postAutomation')
+const instagramAutomation = require('../automation/instagramAutomation')
+const tiktokAutomation = require('../automation/tiktokAutomation')
+const { ManualInterventionError, JobExecutionError } = require('../automation/postAutomation')
 const { JOB_STATUS } = require('../automation/statusCodes')
 const { getDataDir } = require('../db/database')
 
@@ -14,9 +17,19 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+// Moi nen tang co 1 module automation rieng (DOM hoan toan khac nhau), dung
+// chung 1 chu ky ham executeJob({page, target, content, mediaPaths, dryRun,
+// timeouts, screenshotDir, log}) va nem chung ManualInterventionError/
+// JobExecutionError de logic hang doi ben duoi khong can biet nen tang nao.
+const AUTOMATION_BY_PLATFORM = {
+  facebook: facebookAutomation,
+  instagram: instagramAutomation,
+  tiktok: tiktokAutomation
+}
+
 /**
- * Quy doi 1 PostJob (+ tai khoan cua no) thanh doi tuong target ma
- * postAutomation.executeJob can: { type, url, name }.
+ * Quy doi 1 PostJob (+ tai khoan cua no) thanh doi tuong target ma cac
+ * module automation can: { type, url, name }.
  */
 function buildTarget(job, account) {
   if (job.target_type === 'TIMELINE') {
@@ -24,6 +37,12 @@ function buildTarget(job, account) {
   }
   if (job.target_type === 'PAGE') {
     return { type: 'PAGE', url: account.fanpage_url, name: 'Fanpage' }
+  }
+  if (job.target_type === 'INSTAGRAM_POST') {
+    return { type: 'INSTAGRAM_POST', url: 'https://www.instagram.com/', name: 'Instagram' }
+  }
+  if (job.target_type === 'TIKTOK_POST') {
+    return { type: 'TIKTOK_POST', url: 'https://www.tiktok.com/upload', name: 'TikTok' }
   }
   return { type: 'GROUP', url: job.group_url, name: job.group_name }
 }
@@ -75,6 +94,10 @@ class PostQueue extends EventEmitter {
     if (this.isBusy()) {
       throw new Error('Đang có một chiến dịch khác đang chạy. Vui lòng dừng trước khi bắt đầu chiến dịch mới.')
     }
+
+    // Bat truong hop app da mo lien tuc qua nua dem - luc app khoi dong co
+    // the van con "hom qua", nen kiem tra lai ngay truoc moi lan chay.
+    accountService.resetDailyCountersIfNewDay()
 
     this.currentPostId = postId
     this._stopRequested = false
@@ -177,9 +200,10 @@ class PostQueue extends EventEmitter {
         })
 
         const target = buildTarget(job, account)
+        const automation = AUTOMATION_BY_PLATFORM[job.platform || 'facebook'] || facebookAutomation
 
         try {
-          const result = await executeJob({
+          const result = await automation.executeJob({
             page,
             target,
             content: campaign.content,
@@ -192,7 +216,7 @@ class PostQueue extends EventEmitter {
 
           postService.updateJob(job.id, {
             status: result.status,
-            facebook_post_url: result.facebookPostUrl || null,
+            post_url: result.postUrl || null,
             posted_at: new Date().toISOString(),
             last_checked_at: new Date().toISOString()
           })

@@ -62,19 +62,22 @@ export default function Dashboard() {
       </div>
 
       <div className="stat-grid">
-        <div className="stat-card"><div className="stat-value">{totalToday}</div><div className="stat-label">Tổng bài hôm nay</div></div>
-        <div className="stat-card"><div className="stat-value" style={{ color: 'var(--green)' }}>{approvedToday}</div><div className="stat-label">Đã duyệt / hiển thị</div></div>
-        <div className="stat-card"><div className="stat-value" style={{ color: 'var(--amber)' }}>{pendingToday}</div><div className="stat-label">Chờ duyệt</div></div>
-        <div className="stat-card"><div className="stat-value" style={{ color: 'var(--red)' }}>{failedToday}</div><div className="stat-label">Đăng thất bại</div></div>
-        <div className="stat-card"><div className="stat-value">{groupsTotal}</div><div className="stat-label">Tổng nhóm</div></div>
-        <div className="stat-card"><div className="stat-value">{accountsTotal}</div><div className="stat-label">Tổng tài khoản</div></div>
+        <div className="stat-card stat-accent-primary"><div className="stat-value">{totalToday}</div><div className="stat-label">Tổng bài hôm nay</div></div>
+        <div className="stat-card stat-accent-green"><div className="stat-value" style={{ color: 'var(--green)' }}>{approvedToday}</div><div className="stat-label">Đã duyệt / hiển thị</div></div>
+        <div className="stat-card stat-accent-amber"><div className="stat-value" style={{ color: 'var(--amber)' }}>{pendingToday}</div><div className="stat-label">Chờ duyệt</div></div>
+        <div className="stat-card stat-accent-red"><div className="stat-value" style={{ color: 'var(--red)' }}>{failedToday}</div><div className="stat-label">Đăng thất bại</div></div>
+        <div className="stat-card stat-accent-blue"><div className="stat-value">{groupsTotal}</div><div className="stat-label">Tổng nhóm</div></div>
+        <div className="stat-card stat-accent-purple"><div className="stat-value">{accountsTotal}</div><div className="stat-label">Tổng tài khoản</div></div>
       </div>
 
       <div className="grid-2">
         <div className="card">
           <h3>Biểu đồ trạng thái bài (toàn bộ lịch sử)</h3>
           {loading && <p className="text-muted">Đang tải...</p>}
-          {!loading && ALL_JOB_STATUSES.map((s) => {
+          {!loading && ALL_JOB_STATUSES.every((s) => !allCounts[s]) && (
+            <p className="text-muted">Chưa có dữ liệu.</p>
+          )}
+          {!loading && ALL_JOB_STATUSES.filter((s) => allCounts[s] > 0).map((s) => {
             const value = allCounts[s] || 0
             const pct = (value / maxAllCount) * 100
             return (
@@ -97,7 +100,7 @@ export default function Dashboard() {
           <div style={{ maxHeight: 420, overflowY: 'auto' }}>
             {recentLogs.map((l) => (
               <div key={l.id} className={`log-line ${l.log_level}`}>
-                [{new Date(l.created_at).toLocaleString('vi-VN')}] {l.message}
+                [{new Date(l.created_at).toLocaleString('vi-VN')}]{l.performed_by ? ` (${l.performed_by})` : ''} {l.message}
               </div>
             ))}
           </div>

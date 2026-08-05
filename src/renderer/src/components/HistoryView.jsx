@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { toast } from '../lib/toast.js'
 import StatusBadge from './StatusBadge.jsx'
-import { ALL_JOB_STATUSES, JOB_STATUS_LABEL_VI, TARGET_TYPE_LABEL_VI } from '../constants/statusMap'
+import { ALL_JOB_STATUSES, JOB_STATUS_LABEL_VI, TARGET_TYPE_LABEL_VI, RETRYABLE_STATUSES } from '../constants/statusMap'
 
 export default function HistoryView({ title, description, initialStatus = '' }) {
   const [rows, setRows] = useState([])
@@ -20,6 +20,7 @@ export default function HistoryView({ title, description, initialStatus = '' }) 
 
   const [detailJob, setDetailJob] = useState(null)
   const [busyId, setBusyId] = useState(null)
+  const [retryingId, setRetryingId] = useState(null)
 
   function buildFilters(withStatus = true) {
     const f = {}
@@ -73,12 +74,20 @@ export default function HistoryView({ title, description, initialStatus = '' }) 
   }
 
   async function retry(job) {
+    setRetryingId(job.id)
     try {
       await window.api.posts.retryJob(job.id)
-      toast.info('Đã đưa job vào lại hàng đợi. Vào Tạo bài đăng để chạy lại chiến dịch nếu hàng đợi đã dừng, hoặc bắt đầu chiến dịch mới.')
-      load()
+      toast.info(`Đang đăng lại vào "${job.target_name}"...`)
+      // queue:start cho ca chien dich (post_id) - vi chi job nay dang o
+      // trang thai QUEUED (cac job khac cua chien dich da xong tu truoc),
+      // hang doi se chi xu ly dung job vua duoc dat lai nay.
+      await window.api.queue.start(job.post_id)
+      toast.info('Đã đăng lại xong, xem kết quả trong bảng bên dưới.')
     } catch (err) {
       toast.error(err.message)
+    } finally {
+      setRetryingId(null)
+      load()
     }
   }
 
@@ -98,8 +107,8 @@ export default function HistoryView({ title, description, initialStatus = '' }) 
   }
 
   function openOnFacebook(job) {
-    if (!job.facebook_post_url) return toast.error('Chưa có link bài viết.')
-    window.api.system.openExternal(job.facebook_post_url)
+    if (!job.post_url) return toast.error('Chưa có link bài viết.')
+    window.api.system.openExternal(job.post_url)
   }
 
   async function exportCsv() {
@@ -176,6 +185,7 @@ export default function HistoryView({ title, description, initialStatus = '' }) 
           <thead>
             <tr>
               <th>Chiến dịch</th>
+              <th>Người thực hiện</th>
               <th>Tài khoản</th>
               <th>Đích đăng</th>
               <th>Nội dung</th>
@@ -189,11 +199,12 @@ export default function HistoryView({ title, description, initialStatus = '' }) 
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={11} className="empty-state">Đang tải...</td></tr>}
-            {!loading && rows.length === 0 && <tr><td colSpan={11} className="empty-state">Không có dữ liệu phù hợp bộ lọc.</td></tr>}
+            {loading && <tr><td colSpan={12} className="empty-state">Đang tải...</td></tr>}
+            {!loading && rows.length === 0 && <tr><td colSpan={12} className="empty-state">Không có dữ liệu phù hợp bộ lọc.</td></tr>}
             {rows.map((job) => (
               <tr key={job.id}>
                 <td>{job.campaign_name}</td>
+                <td className="text-muted">{job.performed_by || '—'}</td>
                 <td>{job.account_name}</td>
                 <td>
                   <span className="badge badge-blue" style={{ marginRight: 6 }}>{TARGET_TYPE_LABEL_VI[job.target_type] || job.target_type}</span>
@@ -205,14 +216,18 @@ export default function HistoryView({ title, description, initialStatus = '' }) 
                 <td className="text-muted">{job.created_at ? new Date(job.created_at).toLocaleString('vi-VN') : '—'}</td>
                 <td className="text-muted">{job.posted_at ? new Date(job.posted_at).toLocaleString('vi-VN') : '—'}</td>
                 <td><StatusBadge status={job.status} /></td>
-                <td>{job.facebook_post_url ? <a href="#" onClick={(e) => { e.preventDefault(); openOnFacebook(job) }}>Mở link</a> : '—'}</td>
+                <td>{job.post_url ? <a href="#" onClick={(e) => { e.preventDefault(); openOnFacebook(job) }}>Mở link</a> : '—'}</td>
                 <td className="text-muted" style={{ maxWidth: 160 }}>{job.error_message || '—'}</td>
                 <td className="text-muted">{job.last_checked_at ? new Date(job.last_checked_at).toLocaleString('vi-VN') : '—'}</td>
                 <td>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <button className="btn btn-sm" onClick={() => setDetailJob(job)}>Chi tiết</button>
                     <button className="btn btn-sm" disabled={busyId === job.id} onClick={() => recheck(job)}>Kiểm tra lại</button>
-                    {job.status === 'FAILED' && <button className="btn btn-sm" onClick={() => retry(job)}>Đăng lại</button>}
+                    {RETRYABLE_STATUSES.has(job.status) && (
+                      <button className="btn btn-sm" disabled={retryingId !== null} onClick={() => retry(job)}>
+                        {retryingId === job.id ? 'Đang đăng lại...' : 'Đăng lại'}
+                      </button>
+                    )}
                     <button className="btn btn-sm" onClick={() => copyContent(job)}>Sao chép ND</button>
                     <button className="btn btn-sm btn-danger" onClick={() => removeRow(job)}>Xóa</button>
                   </div>

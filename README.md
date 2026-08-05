@@ -112,7 +112,7 @@ không cần mở terminal.
 
 ## 4. Hướng dẫn thêm Chrome Profile / đăng nhập tài khoản
 
-1. Vào menu **Tài khoản Facebook** → **+ Thêm tài khoản**.
+1. Vào menu **Tài khoản MXH** → **+ Thêm tài khoản**.
 2. Đặt "Tên hiển thị" (ví dụ: Nick 1) và bấm **Chọn thư mục** để chọn (hoặc tạo mới) một
    thư mục **riêng biệt** cho tài khoản này — đây chính là "Chrome Profile" mà Playwright
    sẽ dùng (`launchPersistentContext`). **Mỗi tài khoản một thư mục riêng, không dùng
@@ -138,7 +138,7 @@ Nút **Kiểm tra truy cập** sẽ mở nhóm bằng một tài khoản cụ th
 có xem/đăng bài được trong nhóm hay không, và tự cập nhật trạng thái.
 
 **Fanpage**: mỗi tài khoản chỉ gắn được đúng **một** Fanpage — nhập URL Fanpage ở màn hình
-**Tài khoản Facebook** (field "Fanpage URL"), với điều kiện tài khoản đó là quản trị viên
+**Tài khoản MXH** (field "Fanpage URL"), với điều kiện tài khoản đó là quản trị viên
 của Fanpage đó. Không cần bước gán riêng như Nhóm. **Trang cá nhân** thì luôn khả dụng
 cho mọi tài khoản, không cần cấu hình gì thêm.
 
@@ -208,7 +208,99 @@ Khi tool báo lỗi `FACEBOOK_LAYOUT_CHANGED` / `POST_COMPOSER_NOT_FOUND` / tư�
 
 Toàn bộ enum nằm ở [`src/main/automation/statusCodes.js`](src/main/automation/statusCodes.js).
 
-## 10. Đóng gói thành file cài đặt Windows
+## 10. Kho video (Google Sheets + Google Drive) — Giai đoạn 1 lộ trình mở rộng
+
+Cho phép đồng bộ danh sách video (link Google Drive) từ 1 Google Sheet, tải video về máy,
+dùng để tạo bài đăng, và tự ghi lại link kết quả ngược về Sheet sau khi đăng xong.
+
+### Cấu trúc cột (tuỳ chỉnh theo sheet thật đang dùng — xem `COL` trong
+[`src/main/services/googleSheetsService.js`](src/main/services/googleSheetsService.js) nếu cần đổi)
+
+Hàng 1 là tiêu đề có sẵn (tool không tự động ghi/sửa). Dữ liệu bắt đầu từ hàng 2. Tool
+**chỉ đọc/ghi đúng 4 cột dưới đây**, không đụng tới các cột khác trong sheet:
+
+| Cột | Nội dung | Ai điền |
+|---|---|---|
+| A | Tên video | Bạn |
+| B | Link video (Google Drive) | Bạn |
+| C | Link kết quả sau khi đăng | Tool |
+| D | Đã đăng xong (tick TRUE) | Tool |
+
+Dùng 1 Google Sheet **riêng, sạch** cho tool này (không dùng chung với sheet sản xuất nội
+dung phức tạp khác của bạn nếu có, để tránh nhầm lẫn/ghi đè cột không liên quan).
+
+Trạng thái chi tiết, lỗi, ngày giờ đăng... được lưu trong database nội bộ và xem trực tiếp
+ở màn hình **Kho video** trong tool — không ghi ra Sheet vì sheet không có cột dành riêng
+cho các thông tin này.
+
+### Cách kết nối (làm 1 lần)
+
+1. Tạo project tại [console.cloud.google.com](https://console.cloud.google.com), bật **Google
+   Sheets API** và **Google Drive API** (APIs & Services → Library).
+2. Tạo **Service Account** (APIs & Services → Credentials → Create Credentials → Service
+   Account), sau đó vào tab **Keys** của Service Account đó → **Add Key → Create new key →
+   JSON** → tải file `.json` về, lưu ở nơi an toàn.
+3. Mở file JSON, copy giá trị `client_email`.
+4. **Share** Google Sheet cho email đó với quyền **Editor**.
+5. **Share** file/thư mục video trên Google Drive cho email đó (Viewer là đủ), hoặc bật
+   "Anyone with the link" — nếu không, tool sẽ không tải được video (lỗi 403/404).
+6. Vào **Cài đặt** trong tool → nhập **Google Sheet ID** (lấy từ URL Sheet), **tên tab**, và
+   chọn **file khoá JSON** vừa tải → bấm **Kiểm tra kết nối**.
+
+### Cách dùng
+
+Vào **Kho video** → **Đồng bộ từ Google Sheet** → bấm **Tải về** cho video muốn dùng → bấm
+**Dùng để tạo bài đăng** (tự điền sẵn video + nội dung gợi ý sang màn hình Tạo bài đăng) →
+đăng như bình thường. Sau khi đăng thật (không phải DRY_RUN) xong, tool tự ghi trạng thái +
+link bài viết ngược lại Kho video và Google Sheet — không cần copy tay.
+
+Đây là **Giai đoạn 1** trong lộ trình mở rộng đa nền tảng (Google Sheets → AI viết caption →
+lịch đăng tự động cho Facebook → Instagram → TikTok → Threads). AI viết caption/Instagram/
+TikTok/Threads **chưa có** trong bản này.
+
+## 11. Lịch đăng tự động — Giai đoạn 3
+
+Cho phép đặt sẵn khung giờ trong ngày; đến giờ, tool **tự động** (không cần bấm gì):
+
+1. Đồng bộ lại Google Sheet.
+2. Lấy video kế tiếp trong Kho video (ưu tiên video đã tải sẵn, chưa tải thì tự tải).
+3. Tạo chiến dịch với đúng tài khoản/đích đăng đã cấu hình cho khung giờ đó.
+4. Chạy hàng đợi đăng bài.
+5. Ghi kết quả về Kho video + Google Sheet.
+
+**Giới hạn quan trọng cần biết:**
+
+- Lịch **chỉ chạy khi app đang mở** — đây không phải dịch vụ nền 24/7 của Windows. Tắt app =
+  lịch hôm đó không chạy.
+- Khi gặp CAPTCHA/checkpoint/hết phiên đăng nhập, lịch **vẫn dừng lại** và gửi thông báo hệ
+  điều hành (Windows toast) để bạn xử lý thủ công — **không có** cơ chế tự động vượt qua dưới
+  bất kỳ hình thức nào, giữ đúng nguyên tắc an toàn xuyên suốt của tool.
+- Nếu 2 lịch trùng đúng giờ, lịch chạy sau sẽ đợi lịch trước xong (xử lý tuần tự, không chạy
+  song song).
+- Vào **Lịch đăng tự động** trong app để thêm/sửa/xoá lịch, bật/tắt, hoặc bấm **"Chạy thử
+  ngay"** để kiểm tra một lịch mà không cần chờ đúng giờ.
+
+## 12. Đăng Instagram — Giai đoạn 4 (mới, best-effort)
+
+Đăng lên Instagram bằng **giả lập trình duyệt** (Playwright điều khiển instagram.com), không
+dùng API chính thức của Meta.
+
+- **Dùng lại đúng tài khoản/Chrome Profile hiện có** — không cần tạo tài khoản riêng cho
+  Instagram. Bạn phải **tự đăng nhập Instagram thủ công** trong đúng Chrome Profile của tài
+  khoản đó (Tài khoản MXH → "Mở để đăng nhập" → tự đăng nhập thêm Instagram trong cùng
+  cửa sổ đó).
+- Ở màn hình **Tạo bài đăng** và **Lịch đăng tự động**, mỗi tài khoản có thêm checkbox
+  **"Đăng lên Instagram"**.
+- ⚠️ **Selector Instagram (`src/main/automation/instagramSelectors.js`) là best-effort, CHƯA
+  được kiểm chứng trên tài khoản thật** (khác với selector Facebook đã qua nhiều lần chỉnh
+  sửa thực tế). Gần như chắc chắn cần chạy DRY_RUN và chỉnh sửa selector vài lần trước khi
+  dùng thật — xem lại mục 8 (cách sửa selector), áp dụng tương tự cho file này.
+- Instagram không phải lúc nào cũng trả về link bài viết ngay sau khi đăng — job có thể dừng
+  ở trạng thái "Đăng thành công" (`POSTED`) mà không có link, khác với Facebook (`PUBLISHED`
+  kèm link).
+- Instagram bắt buộc phải có ảnh/video đính kèm (không đăng được bài chỉ có chữ).
+
+## 13. Đóng gói thành file cài đặt Windows
 
 ```bash
 npm run dist:win
@@ -217,17 +309,131 @@ npm run dist:win
 electron-builder sẽ tạo file cài đặt NSIS (`.exe`) trong thư mục `release/` (cấu hình ở
 khoá `"build"` trong `package.json`). Có thể chỉnh `appId`, `productName`, icon... trong đó.
 
-## 11. Giới hạn của bản MVP hiện tại
+## 14. Phát hành bản cập nhật mới (tự động cập nhật cho máy nhân viên)
+
+App tự kiểm tra bản mới mỗi khi mở lên (qua GitHub Releases của repo `anhphong0311/supperzzzz`), hỏi
+trước khi tải và hỏi lại trước khi cài đặt — không tự động ép nhân viên cập nhật ngầm. Cơ chế này chỉ
+hoạt động ở bản **đã đóng gói thật** (không hoạt động khi chạy `npm run dev`/`npm run start`).
+
+Quy trình phát hành bản mới (quản trị viên thực hiện):
+
+1. Tăng số `"version"` trong `package.json` (ví dụ `"0.1.0"` → `"0.2.0"`) — **bắt buộc**, app so sánh
+   version này để biết có bản mới hay không.
+2. Chạy `npm run dist:win` — lấy 2 file trong thư mục `release/`: file cài đặt `.exe` và file
+   `latest.yml`.
+3. Vào trang GitHub của repo → tab **Releases** → **Draft a new release** → đặt tag đúng dạng
+   `v0.2.0` (phải khớp chính xác version vừa tăng, có chữ `v` ở đầu) → kéo thả **cả 2 file** (`.exe`
+   và `latest.yml`) vào phần đính kèm release → **Publish release**.
+4. Xong — không cần làm gì thêm phía nhân viên. Lần mở app tiếp theo trên từng máy, app tự phát hiện
+   bản mới và hỏi có muốn tải/cài không.
+
+> Vì app chưa được ký số (code-signed), Windows SmartScreen có thể vẫn hiện cảnh báo khi cài bản cập
+> nhật, tương tự như khi cài đặt lần đầu — không phải lỗi, cứ chọn "More info" → "Run anyway".
+
+## 15. Đăng nhập & phân quyền (Admin / Nhân viên)
+
+Mỗi lần mở app, người dùng phải chọn vai trò:
+
+- **Quản trị (Admin)**: toàn quyền, bao gồm cả trang **Cài đặt** (khoá Google Service
+  Account, giới hạn bài/ngày, thời gian chờ, mật khẩu...).
+- **Nhân viên**: dùng được mọi màn hình còn lại (Tạo bài đăng, Tài khoản, Nhóm, Kho video,
+  Lịch đăng tự động, Lịch sử...) để tự mở Chrome Profile đăng nhập tài khoản của mình và tự
+  đăng bài, nhưng **không** vào được trang Cài đặt.
+
+Mật khẩu Admin và Nhân viên là **2 mật khẩu độc lập**, riêng cho từng máy (mỗi máy có
+database riêng, không đồng bộ giữa các máy — xem mục 17).
+
+## 16. Phần dành cho Nhân viên
+
+1. Nhận file cài đặt (`.exe`) từ quản trị viên, cài đặt bình thường như mọi phần mềm Windows
+   khác (hoặc dùng cách chạy nhanh qua file `.bat` nếu quản trị viên hướng dẫn — xem mục 3).
+2. Mở ứng dụng lần đầu trên máy của mình:
+   - Nếu máy **chưa được quản trị viên thiết lập mật khẩu Admin**, màn hình sẽ bắt thiết lập
+     mật khẩu Admin trước — báo lại cho quản trị viên xử lý bước này, không tự đặt mật khẩu
+     Admin nếu bạn là nhân viên.
+   - Nếu máy đã thiết lập xong, chọn **"Vào với vai trò Nhân viên"** (nhập mật khẩu Nhân
+     viên nếu quản trị viên đã đặt).
+3. Vào menu **Tài khoản MXH**, với mỗi tài khoản mình phụ trách: bấm **"Mở để đăng
+   nhập"**, tự tay đăng nhập Facebook (và Instagram/TikTok trong cùng cửa sổ nếu có dùng) —
+   xem chi tiết mục 4. Đây là bước bắt buộc, tool không lưu mật khẩu Facebook thay bạn.
+4. Vào **Danh sách nhóm** kiểm tra các nhóm mình đã được gán quyền đăng (mục 5).
+5. Vào **Tạo bài đăng**, **luôn bật DRY_RUN trước** để kiểm tra (mục 6) trước khi tắt DRY_RUN
+   để đăng thật (mục 7).
+6. **Nguyên tắc an toàn bắt buộc**: nếu tool báo gặp CAPTCHA/checkpoint/yêu cầu xác minh,
+   **dừng lại ngay, không cố tự vượt qua bằng bất kỳ cách nào**, báo cho quản trị viên biết
+   để xử lý thủ công trên đúng tài khoản đó.
+
+## 17. Phần dành cho Quản trị viên
+
+- **Đóng gói installer để gửi cho nhân viên**: chạy `npm run dist:win` (mục 13), lấy file
+  `.exe` trong thư mục `release/` gửi cho từng nhân viên tự cài trên máy của họ.
+- **Thiết lập mật khẩu Admin lần đầu trên máy nhân viên**: mở app lần đầu trên máy đó, làm
+  theo màn hình thiết lập — nên là người trực tiếp làm bước này (không giao cho nhân viên),
+  vì ai thiết lập trước sẽ là người biết mật khẩu Admin của máy đó.
+- **Tạo/khoá/đặt lại mật khẩu tài khoản Nhân viên**: vào trang **Tài khoản Nhân viên** (chỉ
+  Admin thấy được), mỗi nhân viên có tên đăng nhập + mật khẩu riêng — bài họ tạo ra sẽ ghi lại
+  đúng tên họ trong cột "Người thực hiện" ở Lịch sử.
+- **Đổi mật khẩu Admin**: vào trang Cài đặt, mục "Đổi mật khẩu Admin".
+- **Lưu ý quan trọng**: mỗi máy có **database riêng, độc lập hoàn toàn** — không có nơi tập
+  trung để xem lại hoạt động của tất cả nhân viên cùng lúc. Muốn biết tình hình đăng bài của
+  một nhân viên, cần xem trực tiếp trên máy của người đó (màn hình Lịch sử/Nhật ký hệ thống).
+- **Chưa có cơ chế cập nhật tự động** giữa các máy nhân viên — mỗi khi có bản sửa lỗi/tính
+  năng mới, quản trị viên phải build lại (`npm run dist:win`) và gửi lại file cài đặt mới cho
+  từng nhân viên tự cài đè lên bản cũ.
+
+## 18. Chuyển một tài khoản MXH giữa nhiều máy (dùng luân phiên)
+
+> ⚠️ **Chỉ nên dùng khi thật sự cần thiết.** Facebook/TikTok theo dõi thiết bị đăng nhập vào
+> từng tài khoản. Một tài khoản đổi qua đổi lại giữa nhiều máy vật lý (mỗi máy có dấu vân tay
+> trình duyệt khác nhau) là dấu hiệu điển hình khiến nền tảng yêu cầu xác minh hoặc khoá tạm
+> tài khoản. Tool **không** và **sẽ không** có cơ chế tự động né tránh việc này. Cách an toàn
+> nhất vẫn là mỗi tài khoản MXH gắn cố định với một máy — chỉ dùng quy trình dưới đây khi bắt
+> buộc phải luân phiên, và hiểu rõ rủi ro có thể xảy ra.
+
+Nếu vẫn cần chuyển một tài khoản (Chrome Profile) từ máy A sang máy B:
+
+1. **Trên máy A**: đóng hẳn ứng dụng, đảm bảo không có chiến dịch nào đang chạy cho tài khoản
+   đó (xem Lịch sử/Tổng quan để chắc chắn hàng đợi đã dừng).
+2. Copy **toàn bộ thư mục** Chrome Profile của tài khoản đó (đường dẫn xem ở trang Tài khoản
+   Facebook) sang USB hoặc ổ mạng dùng chung.
+3. **Đổi tên** thư mục gốc trên máy A (ví dụ thêm hậu tố `-DA_CHUYEN_SANG_MAY_B`) thay vì để
+   nguyên tên cũ — tránh vô tình bấm "Mở để đăng nhập" nhầm bản cũ đã lỗi thời sau này.
+4. **Trên máy B**: dán thư mục vừa copy vào một vị trí trên máy, vào **Tài khoản MXH** →
+   **+ Thêm tài khoản** (hoặc **Sửa** nếu tài khoản đã tồn tại trong DB của máy B) → trỏ đúng
+   **Đường dẫn Chrome Profile** tới thư mục vừa dán.
+5. Chỉ đăng bài cho tài khoản đó **từ máy B** kể từ lúc này. Muốn chuyển ngược lại máy A, lặp
+   lại đúng quy trình theo chiều ngược lại.
+6. **Tuyệt đối không** để cả 2 máy cùng có bản Chrome Profile "sống" và cùng chạy đăng bài cho
+   cùng tài khoản đó trong cùng một khoảng thời gian — đây là tình huống rủi ro cao nhất.
+
+Đây là quy trình **thủ công, không có gì trong tool tự động kiểm soát hay ngăn chặn việc dùng
+đồng thời** — an toàn hay không phụ thuộc hoàn toàn vào việc người thực hiện tuân thủ đúng các
+bước trên.
+
+## 19. Giới hạn của bản MVP hiện tại
 
 - Chỉ xử lý **tuần tự** (1 tài khoản tại một thời điểm), chưa hỗ trợ chạy song song nhiều
   tài khoản.
-- Chưa có cơ chế tự động lên lịch (đăng vào một thời điểm định trước) — bấm "Đăng bài" là
-  chạy ngay.
+- Lịch đăng tự động chỉ chạy khi app đang mở, không phải dịch vụ nền 24/7 — xem mục 11.
 - Chưa có nội dung riêng theo từng tài khoản (chỉ dùng chung một nội dung cho tất cả, theo
   đúng yêu cầu bản đầu tiên).
 - Tự động kiểm tra lại bài chờ duyệt theo lịch (`auto_recheck_pending`) mới có cấu hình,
-  chưa có bộ lập lịch chạy nền — hiện tại phải bấm "Kiểm tra lại" thủ công trong Lịch sử.
+  chưa có cơ chế tự chạy — hiện tại phải bấm "Kiểm tra lại" thủ công trong Lịch sử.
 - Selector Facebook có thể lỗi thời theo thời gian — xem mục 8 để tự cập nhật. Selector cho
   bước chuyển danh tính sang Fanpage là selector **dễ lỗi thời nhất**.
 - Mỗi tài khoản chỉ gắn được **một** Fanpage (không hỗ trợ nhiều Fanpage/tài khoản như
   Nhóm) — đủ dùng cho quy mô cá nhân/hộ kinh doanh nhỏ của bản MVP này.
+- Instagram (mục 12) dùng selector best-effort chưa kiểm chứng thực tế — nhiều khả năng cần
+  chỉnh sửa qua vài lần DRY_RUN. Chưa hỗ trợ TikTok, Threads, YouTube.
+- Chưa có AI tự viết caption — nội dung khi đăng từ Kho video lấy từ cột "Tên video" trên
+  Sheet (do người dùng tự điền), tool không tự sinh nội dung.
+- Instagram chưa được lịch đăng tự động (mục 11) hỗ trợ tách giới hạn bài/ngày riêng — dùng
+  chung bộ đếm giới hạn bài/ngày với Facebook của cùng tài khoản.
+- Đăng nhập/phân quyền (mục 15-17) chỉ có 2 vai trò cố định (Admin/Nhân viên) trên từng máy
+  độc lập — chưa có nơi quản lý/theo dõi tập trung nhiều máy.
+- Tự động cập nhật (mục 14) chưa được ký số (code-signed) — Windows SmartScreen có thể vẫn cảnh
+  báo khi cài đặt bản cập nhật, giống hệt lần cài đặt đầu tiên; việc phát hành bản mới lên GitHub
+  Releases vẫn cần quản trị viên làm thủ công (chưa tự động hoá bước upload).
+- Chuyển tài khoản MXH giữa nhiều máy (mục 18) là quy trình **thủ công hoàn toàn** — tool
+  không có cơ chế khoá/kiểm tra để ngăn 2 máy cùng dùng 1 tài khoản đồng thời, rủi ro bị nền
+  tảng gắn cờ "thiết bị lạ" phụ thuộc vào việc tuân thủ đúng quy trình.

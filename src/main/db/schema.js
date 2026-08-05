@@ -77,15 +77,17 @@ CREATE TABLE IF NOT EXISTS post_jobs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   account_id INTEGER NOT NULL REFERENCES facebook_accounts(id),
-  target_type TEXT NOT NULL DEFAULT 'GROUP',
+  platform TEXT NOT NULL DEFAULT 'facebook', -- 'facebook' | 'instagram' | 'tiktok' | 'threads'
+  target_type TEXT NOT NULL DEFAULT 'GROUP', -- FB: GROUP|TIMELINE|PAGE, IG: INSTAGRAM_POST
   group_id INTEGER REFERENCES facebook_groups(id),
   status TEXT NOT NULL DEFAULT 'CHUA_XU_LY',
-  facebook_post_url TEXT,
+  post_url TEXT, -- link ket qua sau khi dang (ten cu: facebook_post_url, doi ten cho dung nghia da nen tang)
   posted_at TEXT,
   last_checked_at TEXT,
   retry_count INTEGER NOT NULL DEFAULT 0,
   error_code TEXT,
   error_message TEXT,
+  performed_by TEXT, -- ten hien thi nguoi tao bai (nhan vien/Quan tri vien/Tu dong (Lich)), luu dang snapshot
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -106,6 +108,69 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Tai khoan Nhan vien rieng (dang nhap bang username/password), de gan
+-- "nguoi thuc hien" vao tung bai dang - xem post_jobs.performed_by
+CREATE TABLE IF NOT EXISTS staff_users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  display_name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'ACTIVE', -- PENDING (cho tu dang ky) | ACTIVE | LOCKED
+  role TEXT NOT NULL DEFAULT 'STAFF', -- STAFF | ADMIN - Admin tu trang Tai khoan Nhan vien
+  wizard_completed INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Kho video dong bo tu Google Sheet (Giai doan 1 - tich hop Google Sheets)
+CREATE TABLE IF NOT EXISTS video_library (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sheet_row_number INTEGER NOT NULL UNIQUE, -- so dong tren Google Sheet (de ghi lai dung dong)
+  video_url TEXT NOT NULL, -- link Google Drive
+  caption_hint TEXT, -- mo ta/goi y noi dung (cot rieng tren sheet, AI se dung lam ngu canh)
+  target_platforms TEXT, -- vd 'facebook,instagram' - rong = tat ca nen tang da bat
+  status TEXT NOT NULL DEFAULT 'CHUA_DANG', -- CHUA_DANG | DANG_TAI | DA_TAI | DANG_DANG | DA_DANG | LOI
+  local_file_path TEXT, -- duong dan file video da tai ve tam
+  facebook_post_url TEXT,
+  instagram_post_url TEXT,
+  threads_post_url TEXT,
+  tiktok_post_url TEXT,
+  error_message TEXT,
+  synced_at TEXT, -- lan dong bo tu sheet gan nhat
+  posted_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Lich dang tu dong theo gio (Giai doan 3). Moi "lich" = 1 khung gio + 1 nhom
+-- dich dang (>=1 dong trong post_schedule_targets). Khi den gio, tool tu lay
+-- video ke tiep con "CHUA_DANG" trong video_library, tao chien dich, chay
+-- hang doi - van DUNG LAI cho nguoi xu ly khi gap checkpoint/CAPTCHA, khong
+-- tu dong vuot qua (giu nguyen nguyen tac an toan cua toan bo tool).
+CREATE TABLE IF NOT EXISTS post_schedules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  time_of_day TEXT NOT NULL, -- 'HH:MM' 24h, theo gio may dang chay app
+  label TEXT,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  dry_run INTEGER NOT NULL DEFAULT 0,
+  last_fired_date TEXT, -- 'YYYY-MM-DD' - tranh chay lap trong cung 1 ngay
+  last_fired_status TEXT,
+  last_fired_message TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS post_schedule_targets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  schedule_id INTEGER NOT NULL REFERENCES post_schedules(id) ON DELETE CASCADE,
+  account_id INTEGER NOT NULL REFERENCES facebook_accounts(id),
+  target_type TEXT NOT NULL DEFAULT 'GROUP',
+  group_id INTEGER REFERENCES facebook_groups(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_schedule_targets_schedule ON post_schedule_targets(schedule_id);
+CREATE INDEX IF NOT EXISTS idx_video_library_status ON video_library(status);
 CREATE INDEX IF NOT EXISTS idx_account_groups_account ON account_groups(account_id);
 CREATE INDEX IF NOT EXISTS idx_account_groups_group ON account_groups(group_id);
 CREATE INDEX IF NOT EXISTS idx_post_jobs_post ON post_jobs(post_id);

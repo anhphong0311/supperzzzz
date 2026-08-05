@@ -1,7 +1,16 @@
-const { getDb } = require('../db/database')
+const path = require('path')
+const crypto = require('crypto')
+const { getDb, getDataDir } = require('../db/database')
 
 function nowIso() {
   return new Date().toISOString()
+}
+
+// Sinh san 1 duong dan Chrome Profile TRONG (chua ton tai) khi nguoi dung
+// khong tu chon thu muc - browserManager.launchProfile() tu tao thu muc
+// truoc khi launchPersistentContext nen khong can khoi tao them gi.
+function generateProfilePath() {
+  return path.join(getDataDir(), 'chrome-profiles', crypto.randomUUID())
 }
 
 function list() {
@@ -24,7 +33,7 @@ function create(data) {
   const info = stmt.run({
     display_name: data.display_name,
     profile_name: data.profile_name || data.display_name,
-    browser_profile_path: data.browser_profile_path,
+    browser_profile_path: data.browser_profile_path || generateProfilePath(),
     login_status: data.login_status || 'CHUA_DANG_NHAP',
     account_status: data.account_status || 'HOAT_DONG',
     notes: data.notes || null,
@@ -80,9 +89,38 @@ function incrementPostsToday(id) {
   return get(id)
 }
 
+// Reset thu cong TOAN BO tai khoan ve 0, khong quan tam ngay - de danh cho
+// nut "Reset bo dem" thu cong trong tuong lai neu can, hien khong duoc goi
+// tu dong o dau ca.
 function resetDailyCounters() {
   const db = getDb()
   db.prepare('UPDATE facebook_accounts SET posts_today = 0, updated_at = @now').run({ now: nowIso() })
+}
+
+/**
+ * Tu dong dua posts_today ve 0 cho NHUNG TAI KHOAN da sang ngay moi (so voi
+ * last_posted_at) va van con dang > 0. KHONG co co che nay truoc day, dan
+ * den tai khoan dat gioi han se bi ket VINH VIEN (posts_today chi tang,
+ * khong bao gio giam) - day la fix cho loi do.
+ *
+ * So sanh theo ngay UTC (lay 10 ky tu dau cua chuoi ISO) de don gian, co
+ * the lech 1 vai gio so voi "ngay" theo gio dia phuong nguoi dung nhung du
+ * dung cho muc dich gioi han spam hang ngay.
+ *
+ * Goi ham nay: (1) moi khi app khoi dong, (2) truoc moi lan bat dau hang doi,
+ * de bat duoc ca truong hop app mo lien tuc qua nua dem.
+ */
+function resetDailyCountersIfNewDay() {
+  const db = getDb()
+  const todayUtc = nowIso().slice(0, 10)
+  list().forEach((acc) => {
+    if (acc.posts_today <= 0) return
+    const lastDateUtc = acc.last_posted_at ? acc.last_posted_at.slice(0, 10) : null
+    if (lastDateUtc !== todayUtc) {
+      db.prepare('UPDATE facebook_accounts SET posts_today = 0, updated_at = @now WHERE id = @id')
+        .run({ id: acc.id, now: nowIso() })
+    }
+  })
 }
 
 module.exports = {
@@ -94,5 +132,6 @@ module.exports = {
   setLoginStatus,
   setAccountStatus,
   incrementPostsToday,
-  resetDailyCounters
+  resetDailyCounters,
+  resetDailyCountersIfNewDay
 }

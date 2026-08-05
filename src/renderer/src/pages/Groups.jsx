@@ -13,6 +13,7 @@ export default function Groups() {
   const [selected, setSelected] = useState(new Set())
 
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showGuideModal, setShowGuideModal] = useState(false)
   const [bulkUrls, setBulkUrls] = useState('')
 
   const [memberModalGroup, setMemberModalGroup] = useState(null)
@@ -117,6 +118,7 @@ export default function Groups() {
           <p>Thêm nhóm bằng URL, gán tài khoản đã tham gia trước khi có thể chọn nhóm khi tạo bài đăng.</p>
         </div>
         <div className="page-actions">
+          <button className="btn btn-sm" onClick={() => setShowGuideModal(true)}>Hướng dẫn</button>
           <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>+ Thêm nhóm</button>
         </div>
       </div>
@@ -248,6 +250,42 @@ export default function Groups() {
 
       {memberModalGroup && (
         <MemberModal group={memberModalGroup} accounts={accounts} onClose={() => setMemberModalGroup(null)} onSaved={load} />
+      )}
+
+      {showGuideModal && (
+        <div className="modal-backdrop" onClick={() => setShowGuideModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Hướng dẫn thêm nhóm</h3>
+              <button className="btn btn-sm" onClick={() => setShowGuideModal(false)}>✕</button>
+            </div>
+            <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8 }}>
+              <li>
+                Bạn phải <strong>tự tham gia nhóm bằng tài khoản Facebook thật trước</strong> — tool
+                không tự động tham gia nhóm hộ bạn.
+              </li>
+              <li>
+                Bấm <strong>"+ Thêm nhóm"</strong>, dán URL nhóm Facebook vào ô nhập (mỗi dòng một URL
+                nếu thêm nhiều nhóm cùng lúc) rồi bấm <strong>"Thêm nhóm"</strong>.
+              </li>
+              <li>
+                Ở dòng nhóm vừa thêm, bấm <strong>"Gán tài khoản"</strong> và tick chọn đúng những tài
+                khoản <strong>thật sự đã là thành viên</strong> của nhóm đó.
+              </li>
+              <li>
+                Bấm <strong>"Kiểm tra truy cập"</strong> để tool xác nhận tài khoản đã chọn có xem/đăng
+                bài được trong nhóm hay không, và tự cập nhật trạng thái hoạt động của nhóm.
+              </li>
+              <li>
+                Chỉ những nhóm đã gán tài khoản mới chọn được khi tạo bài đăng ở màn hình
+                <strong> Tạo bài đăng</strong>.
+              </li>
+            </ol>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+              <button className="btn btn-primary" onClick={() => setShowGuideModal(false)}>Đã hiểu</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

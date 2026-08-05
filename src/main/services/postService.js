@@ -31,7 +31,7 @@ function validateCampaignPayload(payload) {
  * payload: {
  *   campaign_name, content, dry_run, delay_seconds,
  *   media: [{ file_path, file_type }],
- *   selections: [{ account_id, target_type: 'GROUP'|'TIMELINE'|'PAGE', group_id? }]
+ *   selections: [{ account_id, platform: 'facebook'|'instagram', target_type, group_id? }]
  * }
  */
 function createCampaign(payload) {
@@ -52,8 +52,8 @@ function createCampaign(payload) {
     VALUES (@post_id, @file_path, @file_type, @sort_order)
   `)
   const insertJob = db.prepare(`
-    INSERT INTO post_jobs (post_id, account_id, target_type, group_id, status, error_code, error_message)
-    VALUES (@post_id, @account_id, @target_type, @group_id, @status, @error_code, @error_message)
+    INSERT INTO post_jobs (post_id, account_id, platform, target_type, group_id, status, error_code, error_message, performed_by)
+    VALUES (@post_id, @account_id, @platform, @target_type, @group_id, @status, @error_code, @error_message, @performed_by)
   `)
 
   const tx = db.transaction(() => {
@@ -70,7 +70,8 @@ function createCampaign(payload) {
     })
 
     payload.selections.forEach((sel) => {
-      const targetType = sel.target_type || 'GROUP'
+      const platform = sel.platform || 'facebook'
+      const targetType = sel.target_type || (platform === 'instagram' ? 'INSTAGRAM_POST' : platform === 'tiktok' ? 'TIKTOK_POST' : 'GROUP')
       let allowed = true
       let errorCode = null
       let errorMessage = null
@@ -87,10 +88,10 @@ function createCampaign(payload) {
         allowed = !!account?.fanpage_url
         if (!allowed) {
           errorCode = 'PAGE_URL_NOT_SET'
-          errorMessage = 'Tài khoản chưa gắn URL Fanpage. Vào "Tài khoản Facebook" để thêm.'
+          errorMessage = 'Tài khoản chưa gắn URL Fanpage. Vào "Tài khoản MXH" để thêm.'
         }
       }
-      // TIMELINE: luon cho phep, khong can kiem tra gi them.
+      // TIMELINE, INSTAGRAM_POST, TIKTOK_POST: luon cho phep, khong can kiem tra gi them.
 
       const initialStatus = allowed
         ? JOB_STATUS.QUEUED
@@ -101,11 +102,13 @@ function createCampaign(payload) {
       insertJob.run({
         post_id: postId,
         account_id: sel.account_id,
+        platform,
         target_type: targetType,
         group_id: targetType === 'GROUP' ? sel.group_id : null,
         status: initialStatus,
         error_code: errorCode,
-        error_message: errorMessage
+        error_message: errorMessage,
+        performed_by: payload.performed_by || null
       })
     })
 
@@ -127,11 +130,15 @@ function getCampaign(postId) {
         WHEN 'GROUP' THEN g.group_name
         WHEN 'TIMELINE' THEN 'Trang cá nhân'
         WHEN 'PAGE' THEN 'Fanpage'
+        WHEN 'INSTAGRAM_POST' THEN 'Instagram'
+        WHEN 'TIKTOK_POST' THEN 'TikTok'
       END AS target_name,
       CASE pj.target_type
         WHEN 'GROUP' THEN g.group_url
         WHEN 'TIMELINE' THEN 'https://www.facebook.com/'
         WHEN 'PAGE' THEN a.fanpage_url
+        WHEN 'INSTAGRAM_POST' THEN 'https://www.instagram.com/'
+        WHEN 'TIKTOK_POST' THEN 'https://www.tiktok.com/upload'
       END AS target_url
     FROM post_jobs pj
     JOIN facebook_accounts a ON a.id = pj.account_id
@@ -193,11 +200,15 @@ function listJobs(filters = {}) {
         WHEN 'GROUP' THEN g.group_name
         WHEN 'TIMELINE' THEN 'Trang cá nhân'
         WHEN 'PAGE' THEN 'Fanpage'
+        WHEN 'INSTAGRAM_POST' THEN 'Instagram'
+        WHEN 'TIKTOK_POST' THEN 'TikTok'
       END AS target_name,
       CASE pj.target_type
         WHEN 'GROUP' THEN g.group_url
         WHEN 'TIMELINE' THEN 'https://www.facebook.com/'
         WHEN 'PAGE' THEN a.fanpage_url
+        WHEN 'INSTAGRAM_POST' THEN 'https://www.instagram.com/'
+        WHEN 'TIKTOK_POST' THEN 'https://www.tiktok.com/upload'
       END AS target_url
     FROM post_jobs pj
     JOIN posts p ON p.id = pj.post_id
@@ -226,7 +237,7 @@ function updateJob(jobId, data) {
   db.prepare(`
     UPDATE post_jobs SET
       status = @status,
-      facebook_post_url = @facebook_post_url,
+      post_url = @post_url,
       posted_at = @posted_at,
       last_checked_at = @last_checked_at,
       retry_count = @retry_count,
@@ -286,8 +297,8 @@ function deleteJob(jobId) {
 
 function toCsv(rows) {
   const headers = [
-    'campaign_name', 'account_name', 'target_type', 'target_name', 'target_url', 'status',
-    'facebook_post_url', 'posted_at', 'error_code', 'error_message', 'created_at'
+    'campaign_name', 'account_name', 'platform', 'target_type', 'target_name', 'target_url', 'status',
+    'post_url', 'posted_at', 'error_code', 'error_message', 'performed_by', 'created_at'
   ]
   const escape = (v) => {
     if (v === null || v === undefined) return ''

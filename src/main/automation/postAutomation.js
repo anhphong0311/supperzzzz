@@ -37,7 +37,7 @@ class JobExecutionError extends Error {
  * dung giua cac job cua cung mot tai khoan.
  *
  * @param {{type: 'GROUP'|'TIMELINE'|'PAGE', url: string, name: string}} target
- * @returns {{ status: string, facebookPostUrl: string|null, screenshotPath: string|null }}
+ * @returns {{ status: string, postUrl: string|null, screenshotPath: string|null }}
  */
 async function executeJob({ page, target, content, mediaPaths = [], dryRun, timeouts, screenshotDir, log }) {
   const T = {
@@ -90,7 +90,7 @@ async function executeJob({ page, target, content, mediaPaths = [], dryRun, time
     if (unavailable) {
       return {
         status: JOB_STATUS.GROUP_UNAVAILABLE,
-        facebookPostUrl: null,
+        postUrl: null,
         screenshotPath: await captureFailureScreenshot('group-unavailable')
       }
     }
@@ -98,7 +98,7 @@ async function executeJob({ page, target, content, mediaPaths = [], dryRun, time
     if (notMember) {
       return {
         status: JOB_STATUS.NOT_A_MEMBER,
-        facebookPostUrl: null,
+        postUrl: null,
         screenshotPath: await captureFailureScreenshot('not-a-member')
       }
     }
@@ -192,7 +192,7 @@ async function executeJob({ page, target, content, mediaPaths = [], dryRun, time
   if (dryRun) {
     log('INFO', 'DRY_RUN: đã điền nội dung/ảnh, KHÔNG nhấn nút đăng.')
     const shot = await captureFailureScreenshot('dry-run-preview')
-    return { status: JOB_STATUS.DRY_RUN_OK, facebookPostUrl: null, screenshotPath: shot, dryRunChecked: true }
+    return { status: JOB_STATUS.DRY_RUN_OK, postUrl: null, screenshotPath: shot, dryRunChecked: true }
   }
 
   // Buoc 11: Nhan nut dang bai
@@ -209,7 +209,7 @@ async function executeJob({ page, target, content, mediaPaths = [], dryRun, time
   const isPending = await existsAny(page, selectors.postResult.pendingApprovalText, { timeout: 4000 })
   if (isPending) {
     log('INFO', 'Bài viết đang chờ quản trị viên duyệt.')
-    return { status: JOB_STATUS.PENDING_APPROVAL, facebookPostUrl: null, screenshotPath: null }
+    return { status: JOB_STATUS.PENDING_APPROVAL, postUrl: null, screenshotPath: null }
   }
 
   const genericError = await existsAny(page, selectors.postResult.genericError, { timeout: 1500 })
@@ -228,11 +228,11 @@ async function executeJob({ page, target, content, mediaPaths = [], dryRun, time
 
   if (postUrl) {
     log('INFO', `Bài viết đã hiển thị: ${postUrl}`)
-    return { status: JOB_STATUS.PUBLISHED, facebookPostUrl: postUrl, screenshotPath: null }
+    return { status: JOB_STATUS.PUBLISHED, postUrl: postUrl, screenshotPath: null }
   }
 
   log('INFO', 'Facebook đã tiếp nhận thao tác đăng nhưng chưa xác định được bài đã hiển thị hay chưa.')
-  return { status: JOB_STATUS.POSTED, facebookPostUrl: null, screenshotPath: null }
+  return { status: JOB_STATUS.POSTED, postUrl: null, screenshotPath: null }
 }
 
 /**
@@ -241,8 +241,8 @@ async function executeJob({ page, target, content, mediaPaths = [], dryRun, time
  * nhom - ket qua duoc suy ra tu giao dien hien thi va co the khong chinh
  * xac tuyet doi.
  */
-async function recheckJobStatus({ page, facebookPostUrl, targetUrl, screenshotDir, log }) {
-  const urlToOpen = facebookPostUrl || targetUrl
+async function recheckJobStatus({ page, postUrl, targetUrl, screenshotDir, log }) {
+  const urlToOpen = postUrl || targetUrl
   try {
     await page.goto(urlToOpen, { waitUntil: 'domcontentloaded', timeout: 30000 })
     await page.waitForTimeout(1500)
@@ -251,7 +251,7 @@ async function recheckJobStatus({ page, facebookPostUrl, targetUrl, screenshotDi
       throw new ManualInterventionError(ERROR_CODES.CHECKPOINT_DETECTED, 'Phát hiện checkpoint khi kiểm tra lại trạng thái.')
     }
 
-    if (facebookPostUrl) {
+    if (postUrl) {
       const stillThere = await existsAny(page, ['article', 'div[role="article"]'], { timeout: 3000 })
       if (stillThere) {
         log('INFO', 'Bài viết vẫn hiển thị công khai -> APPROVED.')

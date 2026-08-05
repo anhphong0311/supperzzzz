@@ -52,7 +52,7 @@ export default function Accounts() {
 
   async function save() {
     if (!form.display_name.trim()) return toast.error('Vui lòng nhập tên hiển thị.')
-    if (!form.browser_profile_path.trim()) return toast.error('Vui lòng chọn đường dẫn Chrome Profile.')
+    if (editingId && !form.browser_profile_path.trim()) return toast.error('Vui lòng chọn đường dẫn Chrome Profile.')
     try {
       if (editingId) {
         await window.api.accounts.update(editingId, form)
@@ -114,8 +114,8 @@ export default function Accounts() {
     <div>
       <div className="page-header">
         <div>
-          <h1>Tài khoản Facebook</h1>
-          <p>Mỗi tài khoản dùng một Chrome Profile riêng. Bạn cần tự đăng nhập Facebook thủ công trên từng profile.</p>
+          <h1>Tài khoản MXH</h1>
+          <p>Mỗi tài khoản dùng một Chrome Profile riêng. Bạn cần tự đăng nhập Facebook/TikTok/Instagram thủ công trên từng profile.</p>
         </div>
         <div className="page-actions">
           <button className="btn btn-primary" onClick={openCreate}>+ Thêm tài khoản</button>
@@ -123,7 +123,41 @@ export default function Accounts() {
       </div>
 
       <div className="warning-banner">
-        Tool không lưu mật khẩu Facebook. Mỗi tài khoản chỉ dùng đúng phiên đăng nhập (Chrome Profile) mà bạn đã tự đăng nhập trước đó.
+        Tool không lưu mật khẩu Facebook/TikTok/Instagram. Mỗi tài khoản chỉ dùng đúng phiên đăng nhập (Chrome Profile) mà bạn đã tự đăng nhập trước đó.
+      </div>
+
+      <div className="card">
+        <h3>Hướng dẫn thêm tài khoản (đọc trước khi bấm "+ Thêm tài khoản")</h3>
+        <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8 }}>
+          <li>Bấm <strong>"+ Thêm tài khoản"</strong>, đặt <strong>Tên hiển thị</strong> để tự nhận biết (ví dụ: "Nick 1", "TikTok Long").</li>
+          <li>
+            Để trống ô <strong>Đường dẫn Chrome Profile</strong> — tool sẽ tự tạo một thư mục trống
+            riêng cho tài khoản này. Chỉ cần tự chọn thư mục khi bạn đang chuyển một tài khoản có sẵn
+            từ máy khác sang (xem mục 18 README).
+            <div className="hint" style={{ marginTop: 4 }}>
+              Nếu cần tự tạo thư mục thủ công: mở <strong>File Explorer</strong> → vào ổ đĩa/thư mục
+              muốn lưu (ví dụ ổ <span className="mono">C:\</span>) → <strong>chuột phải vào khoảng
+              trống</strong> → chọn <strong>New → Folder</strong> → đặt tên dễ nhớ (ví dụ tên tài
+              khoản) → bấm <strong>"Chọn thư mục"</strong> trong tool và chọn đúng thư mục vừa tạo.
+            </div>
+          </li>
+          <li>Bấm <strong>Lưu</strong>, sau đó bấm <strong>"Mở để đăng nhập"</strong> — một cửa sổ Chrome thật sẽ mở ra.</li>
+          <li>
+            Trong cửa sổ đó, <strong>tự tay đăng nhập</strong> Facebook và/hoặc TikTok/Instagram (nhập
+            email/mật khẩu, xử lý xác minh 2 lớp nếu có) rồi đóng cửa sổ lại — tool không có quyền
+            và không cần biết mật khẩu của bạn.
+          </li>
+          <li>Bấm <strong>"Kiểm tra đăng nhập"</strong> để tool xác nhận trạng thái đăng nhập Facebook.</li>
+          <li>
+            Nếu tài khoản này dùng để đăng vào <strong>Nhóm Facebook</strong>, sang trang <strong>Danh
+            sách nhóm</strong> để dán URL nhóm và gán tài khoản. Nếu chỉ đăng <strong>TikTok</strong>
+            hoặc <strong>Trang cá nhân</strong>, có thể bỏ qua bước này.
+          </li>
+          <li>
+            Sau khi có tài khoản, sang <strong>Tạo bài đăng</strong>, luôn bật <strong>DRY_RUN</strong> để
+            kiểm tra thử trước khi đăng thật.
+          </li>
+        </ol>
       </div>
 
       <div className="table-wrap">
@@ -205,12 +239,16 @@ export default function Accounts() {
               <input type="text" value={form.profile_name} onChange={(e) => setForm({ ...form, profile_name: e.target.value })} placeholder="Ví dụ: Nick 1 - Bán chính" />
             </div>
             <div className="field">
-              <label>Đường dẫn Chrome Profile</label>
+              <label>Đường dẫn Chrome Profile {!editingId && '(tuỳ chọn)'}</label>
               <div style={{ display: 'flex', gap: 8 }}>
-                <input type="text" value={form.browser_profile_path} onChange={(e) => setForm({ ...form, browser_profile_path: e.target.value })} placeholder="Chọn thư mục..." />
+                <input type="text" value={form.browser_profile_path} onChange={(e) => setForm({ ...form, browser_profile_path: e.target.value })} placeholder={editingId ? 'Chọn thư mục...' : 'Để trống sẽ tự tạo mới'} />
                 <button className="btn btn-sm" onClick={pickFolder}>Chọn thư mục</button>
               </div>
-              <div className="hint">Mỗi tài khoản cần một thư mục riêng biệt để lưu phiên đăng nhập độc lập.</div>
+              <div className="hint">Mỗi tài khoản cần một thư mục riêng biệt để lưu phiên đăng nhập độc lập. Để trống khi thêm mới, tool sẽ tự tạo một thư mục trống.</div>
+              <div className="hint" style={{ color: 'var(--amber)' }}>
+                Nếu chuyển thư mục này sang máy khác để dùng luân phiên: tuyệt đối không chạy đăng bài
+                cùng lúc trên 2 máy cho cùng 1 tài khoản — xem quy trình chuyển an toàn trong README (mục 18).
+              </div>
             </div>
             <div className="field">
               <label>Fanpage URL (tuỳ chọn)</label>

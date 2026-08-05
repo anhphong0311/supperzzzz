@@ -47,6 +47,23 @@ export const JOB_STATUS_COLOR = {
 
 export const ALL_JOB_STATUSES = Object.keys(JOB_STATUS_LABEL_VI)
 
+// Cac trang thai duoc phep bam "Dang lai" - moi trang thai "khong thanh cong"
+// va da ket thuc (khong con dang cho/dang chay). KHONG bao gom cac trang thai
+// da thanh cong (POSTED/PUBLISHED/PENDING_APPROVAL/APPROVED/DRY_RUN_OK) hay
+// dang hoat dong (QUEUED/WAITING/IN_PROGRESS).
+export const RETRYABLE_STATUSES = new Set([
+  'FAILED',
+  'STOPPED',
+  'GROUP_UNAVAILABLE',
+  'NOT_A_MEMBER',
+  'TARGET_NOT_CONFIGURED',
+  'LOGIN_EXPIRED',
+  'CHECKPOINT_REQUIRED',
+  'UNKNOWN',
+  'REJECTED',
+  'REMOVED'
+])
+
 export const LOGIN_STATUS_LABEL_VI = {
   DA_DANG_NHAP: 'Đã đăng nhập',
   CHUA_DANG_NHAP: 'Chưa đăng nhập',
@@ -69,5 +86,32 @@ export const GROUP_STATUS_LABEL_VI = {
 export const TARGET_TYPE_LABEL_VI = {
   GROUP: 'Nhóm',
   TIMELINE: 'Trang cá nhân',
-  PAGE: 'Fanpage'
+  PAGE: 'Fanpage',
+  INSTAGRAM_POST: 'Instagram',
+  TIKTOK_POST: 'TikTok'
+}
+
+export const PLATFORM_LABEL_VI = {
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
+  threads: 'Threads'
+}
+
+export const VIDEO_STATUS_LABEL_VI = {
+  CHUA_DANG: 'Chưa đăng',
+  DANG_TAI: 'Đang tải video...',
+  DA_TAI: 'Đã tải về máy',
+  DANG_DANG: 'Đang đăng',
+  DA_DANG: 'Đã đăng',
+  LOI: 'Lỗi'
+}
+
+export const VIDEO_STATUS_COLOR = {
+  CHUA_DANG: 'gray',
+  DANG_TAI: 'blue',
+  DA_TAI: 'blue',
+  DANG_DANG: 'blue',
+  DA_DANG: 'green',
+  LOI: 'red'
 }

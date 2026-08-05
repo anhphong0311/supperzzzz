@@ -17,7 +17,7 @@ function listForJob(postJobId) {
 function listRecent(limit = 200) {
   const db = getDb()
   return db.prepare(`
-    SELECT pl.*, pj.account_id, pj.group_id
+    SELECT pl.*, pj.account_id, pj.group_id, pj.performed_by
     FROM post_logs pl
     LEFT JOIN post_jobs pj ON pj.id = pl.post_job_id
     ORDER BY pl.id DESC

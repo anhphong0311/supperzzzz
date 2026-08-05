@@ -198,6 +198,40 @@ function migrate(db) {
     db.run('CREATE INDEX IF NOT EXISTS idx_post_jobs_status ON post_jobs(status)')
     db.run('PRAGMA foreign_keys = ON')
   }
+
+  if (tableHasColumn(db, 'video_library', 'video_url') && !tableHasColumn(db, 'video_library', 'tiktok_post_url')) {
+    db.run('ALTER TABLE video_library ADD COLUMN tiktok_post_url TEXT')
+  }
+
+  // Da nen tang (Instagram/TikTok/Threads): them cot platform, doi ten
+  // facebook_post_url -> post_url cho dung nghia (khong chi rieng Facebook nua).
+  if (tableHasColumn(db, 'post_jobs', 'target_type') && !tableHasColumn(db, 'post_jobs', 'platform')) {
+    db.run("ALTER TABLE post_jobs ADD COLUMN platform TEXT NOT NULL DEFAULT 'facebook'")
+  }
+  if (tableHasColumn(db, 'post_jobs', 'facebook_post_url') && !tableHasColumn(db, 'post_jobs', 'post_url')) {
+    db.run('ALTER TABLE post_jobs RENAME COLUMN facebook_post_url TO post_url')
+  }
+
+  // Tai khoan Nhan vien rieng: gan "nguoi thuc hien" vao tung job.
+  if (!tableHasColumn(db, 'post_jobs', 'performed_by')) {
+    db.run('ALTER TABLE post_jobs ADD COLUMN performed_by TEXT')
+  }
+
+  // Dang ky tu phuc vu + cho duyet + wizard thiet lap lan dau: gop trang
+  // thai tai khoan Nhan vien ve 1 cot 'status' duy nhat (thay vi 2 cot
+  // is_active/status cung anh huong logic dang nhap), backfill tu is_active cu.
+  if (!tableHasColumn(db, 'staff_users', 'status')) {
+    db.run("ALTER TABLE staff_users ADD COLUMN status TEXT NOT NULL DEFAULT 'ACTIVE'")
+    if (tableHasColumn(db, 'staff_users', 'is_active')) {
+      db.run("UPDATE staff_users SET status = CASE WHEN is_active = 1 THEN 'ACTIVE' ELSE 'LOCKED' END")
+    }
+  }
+  if (!tableHasColumn(db, 'staff_users', 'wizard_completed')) {
+    db.run('ALTER TABLE staff_users ADD COLUMN wizard_completed INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!tableHasColumn(db, 'staff_users', 'role')) {
+    db.run("ALTER TABLE staff_users ADD COLUMN role TEXT NOT NULL DEFAULT 'STAFF'")
+  }
 }
 
 /**

@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { toast } from '../lib/toast.js'
 import StatusBadge from '../components/StatusBadge.jsx'
 import { TARGET_TYPE_LABEL_VI } from '../constants/statusMap'
+import { useAuth } from '../context/AuthContext.jsx'
 
 const MAX_CONTENT_LENGTH = 5000
 
 export default function CreatePost() {
+  const { performedByLabel } = useAuth()
   const [campaignName, setCampaignName] = useState('')
   const [content, setContent] = useState('')
   const [media, setMedia] = useState([]) // [{ path, type: 'image' | 'video' }]
@@ -18,18 +21,48 @@ export default function CreatePost() {
   const [selectedGroupsByAccount, setSelectedGroupsByAccount] = useState({})
   const [selectedTimelineAccounts, setSelectedTimelineAccounts] = useState(new Set())
   const [selectedPageAccounts, setSelectedPageAccounts] = useState(new Set())
+  const [selectedInstagramAccounts, setSelectedInstagramAccounts] = useState(new Set())
+  const [selectedTiktokAccounts, setSelectedTiktokAccounts] = useState(new Set())
   const [groupSearch, setGroupSearch] = useState('')
 
   const [submitting, setSubmitting] = useState(false)
   const [running, setRunning] = useState(null) // { postId, totalJobs, completedCount, jobs: [], queueState }
   const [logLines, setLogLines] = useState([])
 
+  const location = useLocation()
+  const [videoLibraryId, setVideoLibraryId] = useState(null)
+
   useEffect(() => {
     window.api.accounts.list().then(setAccounts).catch((err) => toast.error(err.message))
     window.api.settings.getAll().then((s) => {
-      setDryRun(String(s.dry_run_default) === 'true')
+      // Neu wizard thiet lap lan dau da ep san DRY_RUN, khong de gia tri mac
+      // dinh trong Cai dat ghi de lai (effect nay chay bat dong bo, co the
+      // ket thuc SAU effect doc location.state ben duoi).
+      if (!location.state?.forceDryRun) setDryRun(String(s.dry_run_default) === 'true')
       setDelaySeconds(Number(s.delay_between_posts_seconds || 30))
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Duoc dieu huong tu man hinh "Kho video" (nut "Dung de tao bai dang") ->
+  // dien san video + goi y noi dung, va nho lai id de sau khi dang xong tu
+  // dong ghi ket qua ve lai video_library + Google Sheet. Hoac tu Trinh huong
+  // dan thiet lap lan dau (SetupWizard) -> tu chon san tai khoan vua tao +
+  // ep bat DRY_RUN.
+  useEffect(() => {
+    if (location.state?.videoPath) {
+      setMedia([{ path: location.state.videoPath, type: 'video' }])
+      if (location.state.captionHint) setContent(location.state.captionHint)
+      setVideoLibraryId(location.state.videoLibraryId || null)
+      toast.info('Đã điền sẵn video từ Kho video.')
+    }
+    if (location.state?.wizardAccountId) {
+      toggleAccount(location.state.wizardAccountId)
+    }
+    if (location.state?.forceDryRun) {
+      setDryRun(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -131,6 +164,24 @@ export default function CreatePost() {
     })
   }
 
+  function toggleInstagram(accountId) {
+    setSelectedInstagramAccounts((prev) => {
+      const next = new Set(prev)
+      if (next.has(accountId)) next.delete(accountId)
+      else next.add(accountId)
+      return next
+    })
+  }
+
+  function toggleTiktok(accountId) {
+    setSelectedTiktokAccounts((prev) => {
+      const next = new Set(prev)
+      if (next.has(accountId)) next.delete(accountId)
+      else next.add(accountId)
+      return next
+    })
+  }
+
   function selectAllTargets() {
     const nextGroups = {}
     const nextTimeline = new Set()
@@ -145,31 +196,41 @@ export default function CreatePost() {
     setSelectedGroupsByAccount(nextGroups)
     setSelectedTimelineAccounts(nextTimeline)
     setSelectedPageAccounts(nextPage)
+    // Khong tu dong chon Instagram trong "Chon tat ca" - Instagram automation
+    // con moi/chua kiem chung, de nguoi dung tu tick rieng cho chac.
   }
 
   function clearAllTargets() {
     setSelectedGroupsByAccount({})
     setSelectedTimelineAccounts(new Set())
     setSelectedPageAccounts(new Set())
+    setSelectedInstagramAccounts(new Set())
+    setSelectedTiktokAccounts(new Set())
   }
 
   const totalSelectedJobs = useMemo(() => {
     const groupCount = Object.values(selectedGroupsByAccount).reduce((sum, set) => sum + set.size, 0)
-    return groupCount + selectedTimelineAccounts.size + selectedPageAccounts.size
-  }, [selectedGroupsByAccount, selectedTimelineAccounts, selectedPageAccounts])
+    return groupCount + selectedTimelineAccounts.size + selectedPageAccounts.size + selectedInstagramAccounts.size + selectedTiktokAccounts.size
+  }, [selectedGroupsByAccount, selectedTimelineAccounts, selectedPageAccounts, selectedInstagramAccounts, selectedTiktokAccounts])
 
   function buildSelections() {
     const selections = []
     selectedAccountIds.forEach((accountId) => {
       if (selectedTimelineAccounts.has(accountId)) {
-        selections.push({ account_id: accountId, target_type: 'TIMELINE' })
+        selections.push({ account_id: accountId, platform: 'facebook', target_type: 'TIMELINE' })
       }
       if (selectedPageAccounts.has(accountId)) {
-        selections.push({ account_id: accountId, target_type: 'PAGE' })
+        selections.push({ account_id: accountId, platform: 'facebook', target_type: 'PAGE' })
+      }
+      if (selectedInstagramAccounts.has(accountId)) {
+        selections.push({ account_id: accountId, platform: 'instagram', target_type: 'INSTAGRAM_POST' })
+      }
+      if (selectedTiktokAccounts.has(accountId)) {
+        selections.push({ account_id: accountId, platform: 'tiktok', target_type: 'TIKTOK_POST' })
       }
     })
     Object.entries(selectedGroupsByAccount).forEach(([accountId, groupSet]) => {
-      groupSet.forEach((groupId) => selections.push({ account_id: Number(accountId), target_type: 'GROUP', group_id: groupId }))
+      groupSet.forEach((groupId) => selections.push({ account_id: Number(accountId), platform: 'facebook', target_type: 'GROUP', group_id: groupId }))
     })
     return selections
   }
@@ -181,7 +242,8 @@ export default function CreatePost() {
       dry_run: dryRun,
       delay_seconds: Number(delaySeconds) || 0,
       media: media.map((m) => ({ file_path: m.path, file_type: m.type })),
-      selections: buildSelections()
+      selections: buildSelections(),
+      performed_by: performedByLabel
     }
   }
 
@@ -206,6 +268,35 @@ export default function CreatePost() {
     }
   }
 
+  async function finalizeVideoLibraryIfNeeded(postId) {
+    if (!videoLibraryId) return
+    try {
+      const campaign = await window.api.posts.getCampaign(postId)
+      if (campaign.dry_run) {
+        toast.info('Chế độ DRY_RUN - chưa ghi kết quả vào Kho video/Sheet vì chưa đăng thật.')
+        return
+      }
+      const SUCCESS = ['POSTED', 'PUBLISHED', 'PENDING_APPROVAL', 'APPROVED']
+      // Ghi ket qua rieng cho tung nen tang co trong chien dich (co the vua
+      // dang Facebook vua dang Instagram cung 1 luc tu Kho video).
+      const platforms = [...new Set(campaign.jobs.map((j) => j.platform || 'facebook'))]
+      for (const platform of platforms) {
+        const platformJobs = campaign.jobs.filter((j) => (j.platform || 'facebook') === platform)
+        const successJob = platformJobs.find((j) => SUCCESS.includes(j.status))
+        const failedJob = platformJobs.find((j) => !SUCCESS.includes(j.status))
+        if (successJob) {
+          await window.api.videoLibrary.markPlatformResult(videoLibraryId, platform, { success: true, url: successJob.post_url })
+        } else if (failedJob) {
+          await window.api.videoLibrary.markPlatformResult(videoLibraryId, platform, { success: false, errorMessage: failedJob.error_message })
+        }
+      }
+      await window.api.videoLibrary.writeBackToSheet(videoLibraryId)
+      toast.info('Đã ghi kết quả về Kho video và Google Sheet.')
+    } catch (err) {
+      toast.error(`Không ghi lại được kết quả vào Kho video: ${err.message}`)
+    }
+  }
+
   async function startPosting() {
     const err = validate()
     if (err) return toast.error(err)
@@ -214,7 +305,9 @@ export default function CreatePost() {
     try {
       const campaign = await window.api.posts.createCampaign(buildPayload())
       setRunning({ postId: campaign.id, totalJobs: campaign.jobs.length, completedCount: 0, jobs: campaign.jobs, queueState: 'RUNNING' })
-      window.api.queue.start(campaign.id).catch((e) => toast.error(e.message))
+      window.api.queue.start(campaign.id)
+        .then(() => finalizeVideoLibraryIfNeeded(campaign.id))
+        .catch((e) => toast.error(e.message))
     } catch (e) {
       toast.error(e.message)
     } finally {
@@ -242,6 +335,11 @@ export default function CreatePost() {
         <div>
           <div className="card">
             <h3>Nội dung bài viết</h3>
+            {videoLibraryId && (
+              <div className="warning-banner">
+                Bài này lấy video từ Kho video (dòng Sheet #{videoLibraryId}). Sau khi đăng thật xong, kết quả sẽ tự động ghi lại vào Kho video và Google Sheet.
+              </div>
+            )}
             <div className="field">
               <label>Tên chiến dịch / bài đăng</label>
               <input type="text" value={campaignName} onChange={(e) => setCampaignName(e.target.value)} placeholder="Ví dụ: Khuyến mãi tháng 7" />
@@ -308,8 +406,8 @@ export default function CreatePost() {
 
         <div>
           <div className="card">
-            <h3>Chọn tài khoản Facebook</h3>
-            {accounts.length === 0 && <p className="text-muted">Chưa có tài khoản nào. Vào mục "Tài khoản Facebook" để thêm.</p>}
+            <h3>Chọn tài khoản</h3>
+            {accounts.length === 0 && <p className="text-muted">Chưa có tài khoản nào. Vào mục "Tài khoản MXH" để thêm.</p>}
             {accounts.map((acc) => (
               <div key={acc.id} className="checkbox-row">
                 <input type="checkbox" id={`acc-${acc.id}`} checked={selectedAccountIds.has(acc.id)} onChange={() => toggleAccount(acc.id)} />
@@ -362,9 +460,39 @@ export default function CreatePost() {
                       onChange={() => togglePage(accountId)}
                     />
                     <label htmlFor={`page-${accountId}`} style={{ margin: 0, fontWeight: 400, color: acc?.fanpage_url ? 'var(--text)' : 'var(--text-muted)' }}>
-                      {acc?.fanpage_url ? 'Đăng lên Fanpage' : 'Đăng lên Fanpage (chưa gắn Fanpage — vào "Tài khoản Facebook" để thêm)'}
+                      {acc?.fanpage_url ? 'Đăng lên Fanpage' : 'Đăng lên Fanpage (chưa gắn Fanpage — vào "Tài khoản MXH" để thêm)'}
                     </label>
                   </div>
+
+                  <div className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      id={`ig-${accountId}`}
+                      checked={selectedInstagramAccounts.has(accountId)}
+                      onChange={() => toggleInstagram(accountId)}
+                    />
+                    <label htmlFor={`ig-${accountId}`} style={{ margin: 0, fontWeight: 400, color: 'var(--text)' }}>
+                      Đăng lên Instagram <span className="badge badge-amber">mới - cần kiểm tra kỹ bằng DRY_RUN</span>
+                    </label>
+                  </div>
+                  <p className="hint" style={{ marginLeft: 24, marginTop: -4 }}>
+                    Cần đã đăng nhập Instagram thủ công trong đúng Chrome Profile của tài khoản này.
+                  </p>
+
+                  <div className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      id={`tt-${accountId}`}
+                      checked={selectedTiktokAccounts.has(accountId)}
+                      onChange={() => toggleTiktok(accountId)}
+                    />
+                    <label htmlFor={`tt-${accountId}`} style={{ margin: 0, fontWeight: 400, color: 'var(--text)' }}>
+                      Đăng lên TikTok <span className="badge badge-amber">mới - cần kiểm tra kỹ bằng DRY_RUN</span>
+                    </label>
+                  </div>
+                  <p className="hint" style={{ marginLeft: 24, marginTop: -4 }}>
+                    Cần đã đăng nhập TikTok thủ công trong đúng Chrome Profile của tài khoản này. Chỉ đăng được video (không đăng ảnh).
+                  </p>
 
                   {rows.length === 0 && <p className="text-muted" style={{ fontSize: 12.5 }}>Tài khoản này chưa được gán nhóm nào (vào "Danh sách nhóm" để gán).</p>}
                   {rows.map((r) => (

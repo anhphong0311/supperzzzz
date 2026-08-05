@@ -18,6 +18,24 @@ function on(channel, callback) {
 }
 
 const api = {
+  auth: {
+    hasAdminPassword: () => call('auth:hasAdminPassword'),
+    loginStaff: (username, password) => call('auth:loginStaff', username, password),
+    loginAdmin: (password) => call('auth:loginAdmin', password),
+    setAdminPassword: (currentPassword, newPassword) => call('auth:setAdminPassword', currentPassword, newPassword),
+    registerStaff: (data) => call('auth:registerStaff', data)
+  },
+  staff: {
+    list: () => call('staff:list'),
+    create: (data) => call('staff:create', data),
+    update: (id, data) => call('staff:update', id, data),
+    setStatus: (id, status) => call('staff:setStatus', id, status),
+    setRole: (id, role) => call('staff:setRole', id, role),
+    approve: (id) => call('staff:approve', id),
+    markWizardDone: (id) => call('staff:markWizardDone', id),
+    resetPassword: (id, newPassword) => call('staff:resetPassword', id, newPassword),
+    remove: (id) => call('staff:remove', id)
+  },
   accounts: {
     list: () => call('accounts:list'),
     create: (data) => call('accounts:create', data),
@@ -61,7 +79,30 @@ const api = {
   },
   settings: {
     getAll: () => call('settings:getAll'),
-    setMany: (entries) => call('settings:setMany', entries)
+    setMany: (entries) => call('settings:setMany', entries),
+    pickServiceAccountKeyFile: () => call('settings:pickServiceAccountKeyFile')
+  },
+  videoLibrary: {
+    list: () => call('videoLibrary:list'),
+    testConnection: () => call('videoLibrary:testConnection'),
+    sync: () => call('videoLibrary:sync'),
+    download: (id) => call('videoLibrary:download', id),
+    writeBackToSheet: (id) => call('videoLibrary:writeBackToSheet', id),
+    markPlatformResult: (id, platform, result) => call('videoLibrary:markPlatformResult', id, platform, result),
+    remove: (id) => call('videoLibrary:remove', id)
+  },
+  schedules: {
+    list: () => call('schedules:list'),
+    get: (id) => call('schedules:get', id),
+    create: (payload) => call('schedules:create', payload),
+    setTargets: (id, targets) => call('schedules:setTargets', id, targets),
+    setEnabled: (id, enabled) => call('schedules:setEnabled', id, enabled),
+    update: (id, data) => call('schedules:update', id, data),
+    remove: (id) => call('schedules:remove', id),
+    runNow: (id) => call('schedules:runNow', id),
+    onLog: (cb) => on('scheduler:log', cb),
+    onFireStart: (cb) => on('scheduler:fire-start', cb),
+    onFired: (cb) => on('scheduler:fired', cb)
   },
   logs: {
     listForJob: (jobId) => call('logs:listForJob', jobId),
