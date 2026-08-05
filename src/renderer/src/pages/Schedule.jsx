@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { toast } from '../lib/toast.js'
 import { TARGET_TYPE_LABEL_VI } from '../constants/statusMap'
+import { useAuth } from '../context/AuthContext.jsx'
 
 const FIRE_STATUS_LABEL_VI = {
   DANG_CHAY: 'Đang chạy...',
@@ -185,6 +186,7 @@ export default function Schedule() {
 }
 
 function ScheduleForm({ scheduleId, onClose, onSaved }) {
+  const { role } = useAuth()
   const [timeOfDay, setTimeOfDay] = useState('08:00')
   const [label, setLabel] = useState('')
   const [dryRun, setDryRun] = useState(true)
@@ -384,12 +386,14 @@ function ScheduleForm({ scheduleId, onClose, onSaved }) {
                   {TARGET_TYPE_LABEL_VI.PAGE}{!acc?.fanpage_url && ' (chưa gắn Fanpage)'}
                 </label>
               </div>
-              <div className="checkbox-row">
-                <input type="checkbox" id={`sched-ig-${accountId}`} checked={selectedInstagramAccounts.has(accountId)} onChange={() => toggleInstagram(accountId)} />
-                <label htmlFor={`sched-ig-${accountId}`} style={{ margin: 0, fontWeight: 400, color: 'var(--text)' }}>
-                  {TARGET_TYPE_LABEL_VI.INSTAGRAM_POST} <span className="badge badge-amber">mới</span>
-                </label>
-              </div>
+              {role === 'admin' && (
+                <div className="checkbox-row">
+                  <input type="checkbox" id={`sched-ig-${accountId}`} checked={selectedInstagramAccounts.has(accountId)} onChange={() => toggleInstagram(accountId)} />
+                  <label htmlFor={`sched-ig-${accountId}`} style={{ margin: 0, fontWeight: 400, color: 'var(--text)' }}>
+                    {TARGET_TYPE_LABEL_VI.INSTAGRAM_POST} <span className="badge badge-amber">đang lỗi - chỉ Admin thấy</span>
+                  </label>
+                </div>
+              )}
               <div className="checkbox-row">
                 <input type="checkbox" id={`sched-tt-${accountId}`} checked={selectedTiktokAccounts.has(accountId)} onChange={() => toggleTiktok(accountId)} />
                 <label htmlFor={`sched-tt-${accountId}`} style={{ margin: 0, fontWeight: 400, color: 'var(--text)' }}>

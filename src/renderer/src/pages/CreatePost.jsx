@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 const MAX_CONTENT_LENGTH = 5000
 
 export default function CreatePost() {
-  const { performedByLabel } = useAuth()
+  const { performedByLabel, role } = useAuth()
   const [campaignName, setCampaignName] = useState('')
   const [content, setContent] = useState('')
   const [media, setMedia] = useState([]) // [{ path, type: 'image' | 'video' }]
@@ -464,20 +464,24 @@ export default function CreatePost() {
                     </label>
                   </div>
 
-                  <div className="checkbox-row">
-                    <input
-                      type="checkbox"
-                      id={`ig-${accountId}`}
-                      checked={selectedInstagramAccounts.has(accountId)}
-                      onChange={() => toggleInstagram(accountId)}
-                    />
-                    <label htmlFor={`ig-${accountId}`} style={{ margin: 0, fontWeight: 400, color: 'var(--text)' }}>
-                      Đăng lên Instagram <span className="badge badge-amber">mới - cần kiểm tra kỹ bằng DRY_RUN</span>
-                    </label>
-                  </div>
-                  <p className="hint" style={{ marginLeft: 24, marginTop: -4 }}>
-                    Cần đã đăng nhập Instagram thủ công trong đúng Chrome Profile của tài khoản này.
-                  </p>
+                  {role === 'admin' && (
+                    <>
+                      <div className="checkbox-row">
+                        <input
+                          type="checkbox"
+                          id={`ig-${accountId}`}
+                          checked={selectedInstagramAccounts.has(accountId)}
+                          onChange={() => toggleInstagram(accountId)}
+                        />
+                        <label htmlFor={`ig-${accountId}`} style={{ margin: 0, fontWeight: 400, color: 'var(--text)' }}>
+                          Đăng lên Instagram <span className="badge badge-amber">đang lỗi - chỉ Admin thấy để tự kiểm tra</span>
+                        </label>
+                      </div>
+                      <p className="hint" style={{ marginLeft: 24, marginTop: -4 }}>
+                        Cần đã đăng nhập Instagram thủ công trong đúng Chrome Profile của tài khoản này.
+                      </p>
+                    </>
+                  )}
 
                   <div className="checkbox-row">
                     <input
