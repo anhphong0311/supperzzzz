@@ -306,7 +306,7 @@ dùng API chính thức của Meta.
 npm run dist:win
 ```
 
-electron-builder sẽ tạo file cài đặt NSIS (`.exe`) trong thư mục `release/` (cấu hình ở
+electron-builder sẽ tạo file cài đặt NSIS (`.exe`) trong thư mục `dist/` (cấu hình ở
 khoá `"build"` trong `package.json`). Có thể chỉnh `appId`, `productName`, icon... trong đó.
 
 ## 14. Phát hành bản cập nhật mới (tự động cập nhật cho máy nhân viên)
@@ -319,7 +319,7 @@ Quy trình phát hành bản mới (quản trị viên thực hiện):
 
 1. Tăng số `"version"` trong `package.json` (ví dụ `"0.1.0"` → `"0.2.0"`) — **bắt buộc**, app so sánh
    version này để biết có bản mới hay không.
-2. Chạy `npm run dist:win` — lấy 2 file trong thư mục `release/`: file cài đặt `.exe` và file
+2. Chạy `npm run dist:win` — lấy 2 file trong thư mục `dist/`: file cài đặt `.exe` và file
    `latest.yml`.
 3. Vào trang GitHub của repo → tab **Releases** → **Draft a new release** → đặt tag đúng dạng
    `v0.2.0` (phải khớp chính xác version vừa tăng, có chữ `v` ở đầu) → kéo thả **cả 2 file** (`.exe`
@@ -366,7 +366,7 @@ database riêng, không đồng bộ giữa các máy — xem mục 17).
 ## 17. Phần dành cho Quản trị viên
 
 - **Đóng gói installer để gửi cho nhân viên**: chạy `npm run dist:win` (mục 13), lấy file
-  `.exe` trong thư mục `release/` gửi cho từng nhân viên tự cài trên máy của họ.
+  `.exe` trong thư mục `dist/` gửi cho từng nhân viên tự cài trên máy của họ.
 - **Thiết lập mật khẩu Admin lần đầu trên máy nhân viên**: mở app lần đầu trên máy đó, làm
   theo màn hình thiết lập — nên là người trực tiếp làm bước này (không giao cho nhân viên),
   vì ai thiết lập trước sẽ là người biết mật khẩu Admin của máy đó.
