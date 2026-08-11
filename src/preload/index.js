@@ -80,8 +80,7 @@ const api = {
   },
   settings: {
     getAll: () => call('settings:getAll'),
-    setMany: (entries) => call('settings:setMany', entries),
-    pickServiceAccountKeyFile: () => call('settings:pickServiceAccountKeyFile')
+    setMany: (entries) => call('settings:setMany', entries)
   },
   videoLibrary: {
     list: () => call('videoLibrary:list'),

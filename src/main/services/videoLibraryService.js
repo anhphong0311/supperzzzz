@@ -1,42 +1,15 @@
+const fs = require('fs')
 const path = require('path')
 const { getDb, getDataDir } = require('../db/database')
 const settingsService = require('./settingsService')
-const sheetsApi = require('./googleSheetsService')
-const driveApi = require('./googleDriveService')
+const serverClient = require('./serverClient')
+
+// Dong bo Google Sheet/Drive gio di qua may chu trung tam (server/routes/sheets.js)
+// - server giu 1 Service Account CHUNG, khong con moi may tu cau hinh Sheet
+// ID/file khoa rieng nua (xem plan doi cho tinh nang nay).
 
 function nowIso() {
   return new Date().toISOString()
-}
-
-/**
- * Nguoi dung rat hay dan nham CA DUONG DAN URL vao o "Sheet ID" (vi du
- * https://docs.google.com/spreadsheets/d/XXXX/edit?gid=...) thay vi chi
- * doan ID. Tu dong nhan dien va cat lay dung phan ID de khoi phai bat nguoi
- * dung tu sua tay - day la nguyen nhan loi "Khong tim thay Google Sheet"
- * pho bien nhat.
- */
-function extractSheetId(raw) {
-  if (!raw) return raw
-  const trimmed = raw.trim()
-  // Truong hop dan ca URL day du: https://docs.google.com/spreadsheets/d/{ID}/edit...
-  const fullUrlMatch = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)
-  if (fullUrlMatch) return fullUrlMatch[1]
-  // Truong hop con lai (chi ID, hoac ID dinh kem duoi thua kieu
-  // "{ID}/edit?gid=..." bi mat phan dau "https://...spreadsheets/d/") -
-  // cat toi ky tu '/', '?' hoac '#' dau tien, con lai chinh la ID.
-  const cut = trimmed.split(/[/?#]/)[0]
-  return cut || trimmed
-}
-
-function getSheetConfig() {
-  const s = settingsService.getAll()
-  if (!s.google_sheet_id) throw new Error('Chưa cấu hình Google Sheet ID. Vào Cài đặt để thêm.')
-  if (!s.google_service_account_key_path) throw new Error('Chưa cấu hình file khoá Service Account. Vào Cài đặt để thêm.')
-  return {
-    sheetId: extractSheetId(s.google_sheet_id),
-    tabName: (s.google_sheet_tab_name || 'Sheet1').trim(),
-    keyFilePath: s.google_service_account_key_path
-  }
 }
 
 function list() {
@@ -49,9 +22,8 @@ function get(id) {
   return db.prepare('SELECT * FROM video_library WHERE id = ?').get(id)
 }
 
-async function testConnection() {
-  const cfg = getSheetConfig()
-  return sheetsApi.testConnection(cfg)
+function testConnection() {
+  return serverClient.apiFetch('/api/sheets/status', { auth: true })
 }
 
 /**
@@ -64,8 +36,7 @@ async function testConnection() {
  *   tien trinh dang dang xu ly trong DB.
  */
 async function syncFromSheet() {
-  const cfg = getSheetConfig()
-  const rows = await sheetsApi.readVideoRows(cfg)
+  const rows = await serverClient.apiFetch('/api/sheets/videos', { auth: true })
 
   const db = getDb()
   const upsert = db.prepare(`
@@ -135,13 +106,18 @@ async function downloadVideo(id) {
   try {
     const settings = settingsService.getAll()
     const destDir = path.join(getDataDir(), 'video-downloads')
-    const result = await driveApi.downloadVideo({
-      keyFilePath: settings.google_service_account_key_path,
-      driveUrl: video.video_url,
-      destDir,
+    if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true })
+    // Chua biet ten file that (server tra ve qua header Content-Disposition
+    // SAU khi tai xong) nen tai tam vao 1 duong dan roi doi ten lai.
+    const tempPath = path.join(destDir, `${Date.now()}-tmp`)
+    const downloadPath = `/api/sheets/download?url=${encodeURIComponent(video.video_url)}`
+    const result = await serverClient.downloadToFile(downloadPath, tempPath, {
       timeoutMs: Number(settings.video_download_timeout_ms || 300000)
     })
-    return updateRow(id, { status: 'DA_TAI', local_file_path: result.localPath })
+    const safeName = (result.fileName || `${id}.mp4`).replace(/[\\/:*?"<>|]/g, '_')
+    const finalPath = path.join(destDir, `${Date.now()}-${safeName}`)
+    fs.renameSync(tempPath, finalPath)
+    return updateRow(id, { status: 'DA_TAI', local_file_path: finalPath })
   } catch (err) {
     updateRow(id, { status: 'LOI', error_message: err.message })
     throw err
@@ -155,14 +131,17 @@ async function downloadVideo(id) {
 async function writeBackToSheet(id) {
   const video = get(id)
   if (!video) throw new Error(`Không tìm thấy video id=${id}`)
-  const cfg = getSheetConfig()
   const resultUrl = video.facebook_post_url || video.instagram_post_url || video.threads_post_url || video.tiktok_post_url || ''
   // KHONG duoc dung "co resultUrl hay khong" de tinh done - TikTok (khac
   // Facebook) khong lay duoc link bai dang tu dong nen tiktok_post_url luon
   // rong ke ca khi da dang thanh cong that, se khien cot "Da dang" tren
   // Sheet luon bao FALSE sai. Dung thang trang thai da luu trong DB.
   const done = video.status === 'DA_DANG'
-  await sheetsApi.writeRowResult(cfg, video.sheet_row_number, { resultUrl, done })
+  await serverClient.apiFetch(`/api/sheets/videos/${video.sheet_row_number}/result`, {
+    method: 'POST',
+    body: { resultUrl, done },
+    auth: true
+  })
   return true
 }
 

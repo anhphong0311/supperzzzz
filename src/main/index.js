@@ -237,14 +237,6 @@ function registerIpcHandlers() {
   // --- Cai dat ---
   handle('settings:getAll', () => settingsService.getAll())
   handle('settings:setMany', (entries) => settingsService.setMany(entries))
-  handle('settings:pickServiceAccountKeyFile', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openFile'],
-      filters: [{ name: 'JSON', extensions: ['json'] }]
-    })
-    if (result.canceled || !result.filePaths[0]) return null
-    return result.filePaths[0]
-  })
 
   // --- Kho video (Google Sheets + Drive) ---
   handle('videoLibrary:list', () => videoLibraryService.list())

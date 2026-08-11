@@ -1,9 +1,7 @@
+const fs = require('fs')
 const { app } = require('electron')
 
-// TODO: dien URL Render THAT vao day sau khi trien khai xong (xem
-// server/README.md) roi build lai ban dong goi. Cho toi luc do, ban dong
-// goi se bao loi ket noi ro rang thay vi im lang - dung gia tri placeholder.
-const PROD_URL = 'https://REPLACE_WITH_RENDER_URL.onrender.com'
+const PROD_URL = 'https://fb-multi-poster-auth.onrender.com'
 
 // Che do dev (npm run dev/start, chua dong goi): mac dinh tro vao server
 // chay cuc bo (server/README.md), co the doi qua bien moi truong AUTH_SERVER_URL.
@@ -76,4 +74,50 @@ async function apiFetch(path, { method = 'GET', body, auth = false, onSlow } = {
   }
 }
 
-module.exports = { apiFetch, setToken, clearToken }
+/**
+ * Tai file nhi phan (video) tu server ve dung duong dan cuc bo - dung cho
+ * proxy tai video Google Drive qua server (server giu Service Account
+ * chung, may nhan vien khong can key rieng). Doc ca noi dung vao bo nho roi
+ * ghi 1 lan (don gian hon quan ly stream Node/web), chap nhan duoc voi kich
+ * thuoc video thong thuong.
+ */
+async function downloadToFile(path, destPath, { timeoutMs = 300000 } = {}) {
+  if (!adminToken) throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.')
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(`${getBaseUrl()}${path}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+      signal: controller.signal
+    })
+    if (!res.ok) {
+      let message = `Máy chủ trả về lỗi (mã ${res.status}).`
+      try {
+        const data = await res.json()
+        if (data && data.error) message = data.error
+      } catch (err) {
+        // Bo qua - giu message mac dinh
+      }
+      throw new Error(message)
+    }
+    const disposition = res.headers.get('content-disposition') || ''
+    const match = disposition.match(/filename="([^"]+)"/)
+    const fileName = match ? decodeURIComponent(match[1]) : null
+    const mimeType = res.headers.get('content-type') || null
+    const buffer = Buffer.from(await res.arrayBuffer())
+    fs.writeFileSync(destPath, buffer)
+    return { fileName, mimeType, size: buffer.length }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('Tải video quá thời gian chờ (video quá lớn hoặc mạng chậm).')
+    }
+    if (err instanceof TypeError) {
+      throw new Error('Không thể kết nối máy chủ. Vui lòng kiểm tra Internet và thử lại.')
+    }
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+module.exports = { apiFetch, downloadToFile, setToken, clearToken }

@@ -13,5 +13,11 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: GOOGLE_SHEET_TAB_NAME
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_KEY_BASE64
+        sync: false
       - key: NODE_ENV
         value: production

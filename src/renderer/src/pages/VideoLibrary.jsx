@@ -2,126 +2,13 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from '../lib/toast.js'
 import { VIDEO_STATUS_LABEL_VI, VIDEO_STATUS_COLOR } from '../constants/statusMap'
-import { useAuth } from '../context/AuthContext.jsx'
-
-// Cai dat Google Sheet ID/tab/file khoa la du lieu CUC BO tren TUNG MAY (giong
-// het cach Chrome Profile la cuc bo) - trang "Cai dat" chi Admin vao duoc, nen
-// truoc day Nhan vien khong co cach nao tu cau hinh tren may cua ho, du IPC
-// settings:* khong thuc su chan theo vai tro. Them khoi cau hinh rut gon
-// ngay tai day de Nhan vien tu lam duoc, khong can quyen Admin.
-function GoogleSheetInlineConfig({ onConfigured }) {
-  const [values, setValues] = useState({})
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [testingConn, setTestingConn] = useState(false)
-
-  async function load() {
-    setLoading(true)
-    try {
-      setValues(await window.api.settings.getAll())
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load()
-  }, [])
-
-  function setField(key, value) {
-    setValues((prev) => ({ ...prev, [key]: value }))
-  }
-
-  async function pickKeyFile() {
-    const filePath = await window.api.settings.pickServiceAccountKeyFile()
-    if (filePath) setField('google_service_account_key_path', filePath)
-  }
-
-  async function save() {
-    setSaving(true)
-    try {
-      await window.api.settings.setMany(values)
-      toast.info('Đã lưu cấu hình đồng bộ.')
-      onConfigured?.()
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function testConnection() {
-    setTestingConn(true)
-    try {
-      await window.api.settings.setMany(values)
-      const result = await window.api.videoLibrary.testConnection()
-      toast.info(`Kết nối thành công tới "${result.spreadsheetTitle}" (tab "${result.tabName}").`)
-      onConfigured?.()
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setTestingConn(false)
-    }
-  }
-
-  if (loading) return null
-
-  return (
-    <div className="card">
-      <h3>Cấu hình đồng bộ Google Sheet (chỉ cần làm 1 lần trên máy này)</h3>
-      <p className="hint">Xin thông tin từ Quản trị viên: Google Sheet ID, tên tab, và file khoá Service Account (JSON).</p>
-      <div className="field">
-        <label>Google Sheet ID</label>
-        <input
-          type="text"
-          value={values.google_sheet_id ?? ''}
-          placeholder="Lấy từ URL: docs.google.com/spreadsheets/d/{SHEET_ID}/edit"
-          onChange={(e) => setField('google_sheet_id', e.target.value)}
-        />
-      </div>
-      <div className="field">
-        <label>Tên tab (sheet con) chứa dữ liệu</label>
-        <input
-          type="text"
-          value={values.google_sheet_tab_name ?? ''}
-          placeholder="Sheet1"
-          onChange={(e) => setField('google_sheet_tab_name', e.target.value)}
-        />
-      </div>
-      <div className="field">
-        <label>File khoá Service Account (JSON)</label>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input type="text" readOnly value={values.google_service_account_key_path ?? ''} placeholder="Chưa chọn file..." />
-          <button className="btn btn-sm" onClick={pickKeyFile}>Chọn file...</button>
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button className="btn btn-primary" disabled={saving} onClick={save}>{saving ? 'Đang lưu...' : 'Lưu cấu hình'}</button>
-        <button className="btn" disabled={testingConn} onClick={testConnection}>{testingConn ? 'Đang kiểm tra...' : 'Kiểm tra kết nối'}</button>
-      </div>
-    </div>
-  )
-}
 
 export default function VideoLibrary() {
-  const { role } = useAuth()
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [busyId, setBusyId] = useState(null)
-  const [needsConfig, setNeedsConfig] = useState(false)
   const navigate = useNavigate()
-
-  async function checkConfig() {
-    try {
-      const settings = await window.api.settings.getAll()
-      setNeedsConfig(!settings.google_sheet_id || !settings.google_service_account_key_path)
-    } catch (err) {
-      // Bo qua - khong chan luong chinh vi 1 loi phu
-    }
-  }
 
   async function load() {
     setLoading(true)
@@ -136,7 +23,6 @@ export default function VideoLibrary() {
 
   useEffect(() => {
     load()
-    if (role !== 'admin') checkConfig()
   }, [])
 
   async function sync() {
@@ -217,15 +103,9 @@ export default function VideoLibrary() {
 
       <div className="warning-banner">
         Đọc cột A (tên video) và B (link video) trên Google Sheet, ghi lại cột C (link kết quả)
-        và D (tick khi đăng xong). Cần cấu hình Google Sheet ID + file khoá Service Account trước
-        khi đồng bộ (Admin: vào "Cài đặt"; Nhân viên: điền ở khối bên dưới, chỉ cần làm 1 lần trên
-        máy này). Video Google Drive phải được chia sẻ cho email Service Account (hoặc bật "Anyone
-        with the link").
+        và D (tick khi đăng xong). Bấm "Đồng bộ" là dùng được ngay — không cần cấu hình gì thêm,
+        Google Sheet/Drive đã được kết nối sẵn qua máy chủ chung.
       </div>
-
-      {role !== 'admin' && needsConfig && (
-        <GoogleSheetInlineConfig onConfigured={() => { setNeedsConfig(false); checkConfig() }} />
-      )}
 
       <div className="table-wrap">
         <table>

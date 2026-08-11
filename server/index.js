@@ -4,6 +4,7 @@ const cors = require('cors')
 const { initSchema } = require('./db')
 const authRoutes = require('./routes/auth')
 const staffRoutes = require('./routes/staff')
+const sheetsRoutes = require('./routes/sheets')
 const errorHandler = require('./middleware/errorHandler')
 
 const app = express()
@@ -13,6 +14,7 @@ app.use(express.json())
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }))
 app.use('/api/auth', authRoutes)
 app.use('/api/staff', staffRoutes)
+app.use('/api/sheets', sheetsRoutes)
 
 app.use(errorHandler)
 

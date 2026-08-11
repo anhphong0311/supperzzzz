@@ -19,17 +19,10 @@ const FIELDS = [
   { key: 'dry_run_default', label: 'Mặc định bật DRY_RUN khi tạo bài mới', type: 'bool' }
 ]
 
-const GOOGLE_FIELDS = [
-  { key: 'google_sheet_id', label: 'Google Sheet ID', placeholder: 'Lấy từ URL: docs.google.com/spreadsheets/d/{SHEET_ID}/edit' },
-  { key: 'google_sheet_tab_name', label: 'Tên tab (sheet con) chứa dữ liệu', placeholder: 'Sheet1' }
-]
-
-
 export default function Settings() {
   const [values, setValues] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [testingConn, setTestingConn] = useState(false)
 
   const [adminCurrentPw, setAdminCurrentPw] = useState('')
   const [adminNewPw, setAdminNewPw] = useState('')
@@ -67,11 +60,6 @@ export default function Settings() {
     }
   }
 
-  async function pickKeyFile() {
-    const filePath = await window.api.settings.pickServiceAccountKeyFile()
-    if (filePath) setField('google_service_account_key_path', filePath)
-  }
-
   async function saveAdminPassword() {
     if (!adminNewPw || adminNewPw.length < 4) {
       toast.error('Mật khẩu Admin mới cần ít nhất 4 ký tự.')
@@ -92,20 +80,6 @@ export default function Settings() {
       toast.error(err.message)
     } finally {
       setSavingAdminPw(false)
-    }
-  }
-
-  async function testGoogleConnection() {
-    setTestingConn(true)
-    try {
-      // Luu cai dat truoc de dam bao test dung voi gia tri vua nhap (chua bam Luu)
-      await window.api.settings.setMany(values)
-      const result = await window.api.videoLibrary.testConnection()
-      toast.info(`Kết nối thành công tới "${result.spreadsheetTitle}" (tab "${result.tabName}").`)
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setTestingConn(false)
     }
   }
 
@@ -153,36 +127,6 @@ export default function Settings() {
               )}
             </div>
           ))}
-        </div>
-      )}
-
-      {!loading && (
-        <div className="card">
-          <h3>Kết nối Google Sheets (Kho video)</h3>
-          <p className="hint">
-            Xem hướng dẫn tạo Service Account trong README. Sau khi điền đủ 3 mục dưới, bấm "Kiểm tra kết nối" để xác nhận.
-          </p>
-          {GOOGLE_FIELDS.map((f) => (
-            <div className="field" key={f.key}>
-              <label>{f.label}</label>
-              <input
-                type="text"
-                value={values[f.key] ?? ''}
-                placeholder={f.placeholder}
-                onChange={(e) => setField(f.key, e.target.value)}
-              />
-            </div>
-          ))}
-          <div className="field">
-            <label>File khoá Service Account (JSON)</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input type="text" readOnly value={values.google_service_account_key_path ?? ''} placeholder="Chưa chọn file..." />
-              <button className="btn btn-sm" onClick={pickKeyFile}>Chọn file...</button>
-            </div>
-          </div>
-          <button className="btn" disabled={testingConn} onClick={testGoogleConnection}>
-            {testingConn ? 'Đang kiểm tra...' : 'Kiểm tra kết nối'}
-          </button>
         </div>
       )}
 
