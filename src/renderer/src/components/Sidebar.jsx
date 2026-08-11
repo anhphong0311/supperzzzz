@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 
@@ -12,13 +12,24 @@ const MENU = [
   { to: '/history', label: 'Lịch sử đăng', icon: '🕒' },
   { to: '/pending-approval', label: 'Bài chờ duyệt', icon: '⏳' },
   { to: '/staff-accounts', label: 'Tài khoản Nhân viên', icon: '🧑‍💼', adminOnly: true },
+  { to: '/competitor-pricing', label: 'Theo dõi giá đối thủ', icon: '🛒', adminOnly: true, requiresFlag: 'price_tracking_enabled' },
   { to: '/settings', label: 'Cài đặt', icon: '⚙️', adminOnly: true },
   { to: '/logs', label: 'Nhật ký hệ thống', icon: '🧾' }
 ]
 
 export default function Sidebar() {
   const { role, logout } = useAuth()
-  const items = MENU.filter((item) => !item.adminOnly || role === 'admin')
+  const [settings, setSettings] = useState({})
+
+  useEffect(() => {
+    window.api.settings.getAll().then(setSettings).catch(() => {})
+  }, [])
+
+  const items = MENU.filter((item) => {
+    if (item.adminOnly && role !== 'admin') return false
+    if (item.requiresFlag && String(settings[item.requiresFlag]) !== 'true') return false
+    return true
+  })
 
   return (
     <aside className="sidebar">

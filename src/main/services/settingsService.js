@@ -20,7 +20,13 @@ const DEFAULTS = {
   google_service_account_key_path: '',
   google_sheet_id: '',
   google_sheet_tab_name: 'Sheet1',
-  video_download_timeout_ms: '300000'
+  video_download_timeout_ms: '300000',
+  // Theo doi gia doi thu (module doc lap - mac dinh TAT, khong anh huong
+  // gi phan con lai cua app khi tat). Ghi nhan gia THU CONG - khong tu dong
+  // thu thap, vi Shopee chan cua so trinh duyet tu dong ngay o buoc dang
+  // nhap (da xac nhan qua kiem tra thuc te), khong the vuot qua ma khong vi
+  // pham nguyen tac "khong ne tranh he thong phat hien" cua toan bo tool.
+  price_tracking_enabled: 'false'
 }
 
 function nowIso() {

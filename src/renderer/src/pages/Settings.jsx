@@ -24,6 +24,7 @@ const GOOGLE_FIELDS = [
   { key: 'google_sheet_tab_name', label: 'Tên tab (sheet con) chứa dữ liệu', placeholder: 'Sheet1' }
 ]
 
+
 export default function Settings() {
   const [values, setValues] = useState({})
   const [loading, setLoading] = useState(true)
@@ -206,6 +207,35 @@ export default function Settings() {
           </button>
           <p className="hint" style={{ marginTop: 10 }}>
             Quản lý tài khoản đăng nhập của từng nhân viên ở trang "Tài khoản Nhân viên" riêng.
+          </p>
+        </div>
+      )}
+
+      {!loading && (
+        <div className="card">
+          <h3>Theo dõi giá đối thủ (Shopee) — tính năng riêng, mặc định tắt</h3>
+          <p className="hint">
+            Module độc lập, không ảnh hưởng các chức năng đăng bài khác. Tắt đi thì hệ thống hoạt
+            động y như chưa từng có tính năng này.
+          </p>
+          <div className="field">
+            <div className="checkbox-row">
+              <input
+                type="checkbox"
+                id="price_tracking_enabled"
+                checked={String(values.price_tracking_enabled) === 'true'}
+                onChange={(e) => setField('price_tracking_enabled', e.target.checked ? 'true' : 'false')}
+              />
+              <label htmlFor="price_tracking_enabled" style={{ margin: 0, fontWeight: 400, color: 'var(--text)' }}>
+                Bật theo dõi giá đối thủ
+              </label>
+            </div>
+          </div>
+          <p className="hint">
+            Chỉ ghi nhận giá <strong>thủ công</strong> (bạn tự xem giá trên Shopee bằng trình duyệt
+            thật rồi nhập lại vào tool) — không có crawler tự động, vì Shopee chặn cửa sổ trình
+            duyệt tự động ngay ở bước đăng nhập. Bật xong, vào mục "Theo dõi giá đối thủ" ở menu bên
+            trái (chỉ Admin thấy) để thêm sản phẩm và ghi nhận giá.
           </p>
         </div>
       )}

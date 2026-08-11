@@ -20,6 +20,7 @@ const postQueue = require('./queue/postQueue')
 const schedulerEngine = require('./scheduler/schedulerEngine')
 const notifier = require('./notifier')
 const updater = require('./updater')
+const competitorPriceService = require('./priceTracking/competitorPriceService')
 const { initDb, getDataDir } = require('./db/database')
 
 let mainWindow = null
@@ -107,6 +108,14 @@ function registerIpcHandlers() {
       screenshotDir: path.join(getDataDir(), 'screenshots')
     })
     return accountService.setLoginStatus(id, status)
+  })
+  handle('accounts:checkTiktokLoginStatus', async (id) => {
+    const account = accountService.get(id)
+    if (!account) throw new Error('Không tìm thấy tài khoản.')
+    const settings = settingsService.getAll()
+    const headless = String(settings.headless_mode) === 'true'
+    const status = await browserManager.checkTiktokLoginStatus(account.browser_profile_path, { headless })
+    return accountService.setTiktokLoginStatus(id, status)
   })
 
   // --- Nhom Facebook ---
@@ -270,6 +279,15 @@ function registerIpcHandlers() {
   // --- He thong ---
   handle('system:openExternal', (url) => shell.openExternal(url))
   handle('system:getDataDir', () => getDataDir())
+
+  // --- Theo doi gia doi thu (module doc lap - xem src/main/priceTracking/).
+  // Ghi nhan gia THU CONG - khong co crawler tu dong (Shopee chan cua so
+  // trinh duyet tu dong ngay o buoc dang nhap, xem ghi chu trong settingsService.js).
+  handle('competitor:list', () => competitorPriceService.list())
+  handle('competitor:create', (data) => competitorPriceService.create(data))
+  handle('competitor:remove', (id) => competitorPriceService.remove(id))
+  handle('competitor:priceHistory', (id) => competitorPriceService.listPriceHistory(id))
+  handle('competitor:addPriceEntry', (id, data) => competitorPriceService.addPriceEntry(id, data))
 }
 
 app.whenReady().then(async () => {

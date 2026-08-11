@@ -90,6 +90,22 @@ async function executeJob({ page, content, mediaPaths = [], dryRun, timeouts, sc
     await page.waitForTimeout(3000)
   }
 
+  // TikTok Studio doi khi hien hop thoai hoi bat/tat kiem tra ban quyen/noi
+  // dung tu dong ngay sau khi tai xong video - dong lai (neu co) truoc khi
+  // thao tac tiep, khong thi no se che mat o caption/nut Dang.
+  const dismissBtn = await findFirst(page, selectors.upload.contentCheckDialogDismiss, { timeoutPerCandidate: 1500 })
+  if (dismissBtn) {
+    await dismissBtn.click().catch(() => {})
+    await page.waitForTimeout(500)
+  }
+  // Khung gioi thieu tinh nang moi (neu co) cung phai dong tuong tu - lop
+  // phu trong suot cua no chan click vao ca cac phan khac cua trang.
+  const tooltipBtn = await findFirst(page, selectors.upload.onboardingTooltipDismiss, { timeoutPerCandidate: 1500 })
+  if (tooltipBtn) {
+    await tooltipBtn.click().catch(() => {})
+    await page.waitForTimeout(500)
+  }
+
   // Buoc 3: Dien caption
   log('INFO', 'Đang điền nội dung...')
   const captionBox = await findFirst(page, selectors.upload.captionInput, { timeoutPerCandidate: 8000 })
@@ -97,11 +113,36 @@ async function executeJob({ page, content, mediaPaths = [], dryRun, timeouts, sc
     await fail(ERROR_CODES.CONTENT_INPUT_FAILED, 'Không tìm thấy ô nhập nội dung trên TikTok.', 'tt-caption-not-found')
   }
   if (content) {
-    await captionBox.click()
+    // Du da co buoc dong cac lop phu o tren, van du phong: neu con 1 lop phu
+    // la khong luong truoc duoc nao do chan click binh thuong (het thoi gian
+    // cho), thu lai bang force:true - bo qua kiem tra "co nhan duoc click
+    // hay khong" cua Playwright, vi vi tri phan tu tren man hinh van dung.
+    try {
+      await captionBox.click({ timeout: 10000 })
+    } catch (err) {
+      log('INFO', 'Không bấm được vào ô nội dung theo cách thường, đang thử lại...')
+      await captionBox.click({ force: true })
+    }
     // TikTok caption box thuong da co san hashtag/mo ta goi y - chon het va
     // ghi de bang noi dung that de tranh bi dinh vao van ban mac dinh.
     await page.keyboard.press('Control+A').catch(() => {})
     await page.keyboard.type(content, { delay: 8 })
+    await page.waitForTimeout(500)
+
+    // Kiem tra lai: noi dung vua go co THAT SU nam trong o caption hay
+    // khong. Da tung xay ra truong hop captionBox khop NHAM 1 phan tu khac
+    // tren trang (vd khung ngay/gio "Len lich"), khien noi dung go vao sai
+    // cho, o caption that van con nguyen text mac dinh cua TikTok - PHAI
+    // phat hien som o day thay vi de bam Dang voi noi dung sai.
+    const typedText = await captionBox.innerText().catch(() => '')
+    const expectedSnippet = content.slice(0, Math.min(15, content.length)).trim()
+    if (expectedSnippet && !typedText.includes(expectedSnippet)) {
+      await fail(
+        ERROR_CODES.CONTENT_INPUT_FAILED,
+        `Nội dung gõ vào có vẻ không đúng ô caption thật của TikTok (ô hiện đang có: "${typedText.slice(0, 60)}"). Cần kiểm tra lại giao diện TikTok, KHÔNG bấm Đăng để tránh đăng sai nội dung.`,
+        'tt-caption-mismatch'
+      )
+    }
   }
 
   if (dryRun) {
@@ -112,11 +153,41 @@ async function executeJob({ page, content, mediaPaths = [], dryRun, timeouts, sc
 
   // Buoc 4: Dang bai
   log('INFO', 'Đang bấm Đăng...')
-  const postButton = await findFirst(page, selectors.upload.postButton, { timeoutPerCandidate: 5000 })
-  if (!postButton) {
+  // Dung getByRole (tim theo VAI TRO + TEN HIEN THI ma trinh doc man hinh se
+  // doc, theo dung chuan accessibility) thay vi so khop text tho qua CSS
+  // pseudo-selector - da xac nhan qua thuc te ca ':has-text' (khop kieu
+  // "chua chuoi", bi nham sang muc menu "Bai dang") lan ':text-is' (khop
+  // CHINH XAC toan bo text node, that bai vi nut that co the chua them van
+  // ban an phuc vu accessibility) deu KHONG dang tin cay bang getByRole.
+  const postButtonLocator = page
+    .getByRole('button', { name: 'Đăng', exact: true })
+    .or(page.getByRole('button', { name: 'Post', exact: true }))
+    .or(page.locator('button[data-e2e="post-button"]'))
+  let postButtonFound = true
+  try {
+    await postButtonLocator.first().waitFor({ state: 'visible', timeout: 8000 })
+  } catch (err) {
+    postButtonFound = false
+  }
+  if (!postButtonFound) {
     await fail(ERROR_CODES.SUBMIT_BUTTON_NOT_FOUND, 'Không tìm thấy nút Đăng trên TikTok.', 'tt-post-button-not-found')
   }
-  await postButton.click()
+  const postButton = postButtonLocator.first()
+  // Chup lai man hinh NGAY TRUOC khi bam Dang - de neu ket qua sau do van
+  // sai, co bang chung xem luc do trang dang hien gi (o caption dung/sai,
+  // co lop phu nao con che khong...).
+  await captureFailureScreenshot('tt-before-post-click')
+  try {
+    await postButton.click({ timeout: 10000 })
+  } catch (err) {
+    log('INFO', 'Không bấm được vào nút Đăng theo cách thường, đang thử lại...')
+    await postButton.click({ force: true })
+  }
+  // Va chup ngay SAU khi bam, truoc khi cho xac nhan (buoc cho co the mat
+  // toi hang chuc giay) - de biet chinh xac cu click co lam trang thay doi
+  // gi khong.
+  await page.waitForTimeout(800)
+  await captureFailureScreenshot('tt-after-post-click')
   await page.waitForTimeout(4000)
   await assertNoManualInterventionNeeded('sau khi bấm Đăng')
 
@@ -125,13 +196,31 @@ async function executeJob({ page, content, mediaPaths = [], dryRun, timeouts, sc
     await fail(ERROR_CODES.POST_SUBMIT_FAILED, 'TikTok báo không thể đăng video này.', 'tt-submit-failed')
   }
 
-  const success = await existsAny(page, selectors.postResult.successIndicators, { timeout: 15000 })
+  // Luu y: existsAny() thu LAN LUOT tung selector trong danh sach, MOI cai
+  // deu cho toi "timeout" neu khong khop - voi 5 ung vien va timeout 15s se
+  // mat toi 75s trong truong hop xau nhat. Dung 4s/ung vien (~20s toi da) de
+  // khong lam nguoi dung cho qua lau ma van du thoi gian cho trang phan hoi.
+  const success = await existsAny(page, selectors.postResult.successIndicators, { timeout: 4000 })
   if (success) {
     log('INFO', 'TikTok đã xác nhận đăng video thành công.')
-  } else {
-    log('INFO', 'Không thấy thông báo xác nhận rõ ràng, nhưng không có lỗi - coi như đã tiếp nhận thao tác đăng.')
+    return { status: JOB_STATUS.POSTED, postUrl: null, screenshotPath: null }
   }
 
+  // Khong thay thong bao xac nhan RO RANG - truoc day code mac dinh coi day
+  // la thanh cong (chi can khong co loi), nhung thuc te da gap truong hop
+  // bam Dang khong thuc su an (vi du bi lop phu chan) ma van bi bao "thanh
+  // cong" sai. Kiem tra them: neu trang VAN CON hien form tai video (nut
+  // Dang van con do) thi nhieu kha nang thao tac Dang CHUA thanh cong that -
+  // tra ve UNKNOWN thay vi POSTED, kem anh chup de nguoi dung tu kiem tra
+  // lai tren TikTok Studio, tranh bao sai ket qua.
+  const stillOnUploadForm = await existsAny(page, selectors.upload.postButton, { timeout: 2000 })
+  if (stillOnUploadForm) {
+    const shot = await captureFailureScreenshot('tt-post-unconfirmed')
+    log('ERROR', 'Không xác nhận được TikTok đã đăng thành công (trang vẫn còn hiện form tải video) - vui lòng tự kiểm tra lại trên TikTok Studio.')
+    return { status: JOB_STATUS.UNKNOWN, postUrl: null, screenshotPath: shot }
+  }
+
+  log('INFO', 'Không thấy thông báo xác nhận rõ ràng, nhưng trang đã rời khỏi form đăng - coi như đã tiếp nhận thao tác đăng.')
   // TikTok khong luon hien link video ngay - best-effort, khong dam bao lay
   // duoc URL that (giong Instagram).
   return { status: JOB_STATUS.POSTED, postUrl: null, screenshotPath: null }

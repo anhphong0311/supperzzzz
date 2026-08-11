@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS facebook_accounts (
   display_name TEXT NOT NULL,
   profile_name TEXT NOT NULL,
   browser_profile_path TEXT NOT NULL,
-  login_status TEXT NOT NULL DEFAULT 'CHUA_DANG_NHAP',
+  login_status TEXT NOT NULL DEFAULT 'CHUA_DANG_NHAP', -- trang thai dang nhap Facebook
+  tiktok_login_status TEXT, -- trang thai dang nhap TikTok rieng (NULL = chua kiem tra)
   account_status TEXT NOT NULL DEFAULT 'HOAT_DONG',
   posts_today INTEGER NOT NULL DEFAULT 0,
   last_posted_at TEXT,
@@ -141,6 +142,8 @@ CREATE TABLE IF NOT EXISTS post_schedules (
   label TEXT,
   enabled INTEGER NOT NULL DEFAULT 1,
   dry_run INTEGER NOT NULL DEFAULT 0,
+  video_library_id INTEGER REFERENCES video_library(id),
+  custom_content TEXT,
   last_fired_date TEXT,
   last_fired_status TEXT,
   last_fired_message TEXT,
@@ -157,10 +160,33 @@ CREATE TABLE IF NOT EXISTS post_schedule_targets (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Theo doi gia san pham doi thu (module doc lap - xem src/main/priceTracking/)
+CREATE TABLE IF NOT EXISTS competitor_products (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_name TEXT NOT NULL,
+  product_url TEXT NOT NULL UNIQUE,
+  platform TEXT NOT NULL DEFAULT 'shopee',
+  last_checked_at TEXT,
+  last_status TEXT,
+  last_error_message TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS competitor_price_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  competitor_product_id INTEGER NOT NULL REFERENCES competitor_products(id) ON DELETE CASCADE,
+  listed_price INTEGER,
+  voucher_amount INTEGER,
+  final_price INTEGER,
+  recorded_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_schedule_targets_schedule ON post_schedule_targets(schedule_id);
 CREATE INDEX IF NOT EXISTS idx_video_library_status ON video_library(status);
 CREATE INDEX IF NOT EXISTS idx_account_groups_account ON account_groups(account_id);
 CREATE INDEX IF NOT EXISTS idx_account_groups_group ON account_groups(group_id);
+CREATE INDEX IF NOT EXISTS idx_competitor_price_history_product ON competitor_price_history(competitor_product_id);
 CREATE INDEX IF NOT EXISTS idx_post_jobs_post ON post_jobs(post_id);
 CREATE INDEX IF NOT EXISTS idx_post_jobs_account ON post_jobs(account_id);
 CREATE INDEX IF NOT EXISTS idx_post_jobs_group ON post_jobs(group_id);

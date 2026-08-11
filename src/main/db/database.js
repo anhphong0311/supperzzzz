@@ -232,6 +232,21 @@ function migrate(db) {
   if (!tableHasColumn(db, 'staff_users', 'role')) {
     db.run("ALTER TABLE staff_users ADD COLUMN role TEXT NOT NULL DEFAULT 'STAFF'")
   }
+
+  // Lich dang tu dong: cho phep gan dung 1 video cu the + noi dung rieng,
+  // thay vi luon tu lay "video ke tiep" trong Kho video.
+  if (!tableHasColumn(db, 'post_schedules', 'video_library_id')) {
+    db.run('ALTER TABLE post_schedules ADD COLUMN video_library_id INTEGER REFERENCES video_library(id)')
+  }
+  if (!tableHasColumn(db, 'post_schedules', 'custom_content')) {
+    db.run('ALTER TABLE post_schedules ADD COLUMN custom_content TEXT')
+  }
+
+  // Kiem tra dang nhap TikTok rieng (khong dung chung voi login_status von
+  // chi kiem tra Facebook).
+  if (!tableHasColumn(db, 'facebook_accounts', 'tiktok_login_status')) {
+    db.run('ALTER TABLE facebook_accounts ADD COLUMN tiktok_login_status TEXT')
+  }
 }
 
 /**

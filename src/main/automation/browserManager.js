@@ -40,11 +40,21 @@ async function launchProfile(browserProfilePath, { headless = false, executableP
 /**
  * Mo profile o che do co giao dien de nguoi dung tu dang nhap thu cong.
  * Tra ve context de UI co the bao nguoi dung dong cua so khi xong.
+ *
+ * Dieu huong sang facebook.com CHI la tien ich (da so tai khoan dung de dang
+ * Facebook) - neu tai bi cham/treo vi bat ky ly do gi (mang, tai khoan chi
+ * dung cho TikTok/Instagram khong lien quan facebook.com...), KHONG duoc de
+ * treo vo han - nguoi dung van co the tu go dia chi khac trong chinh cua so
+ * that nay. Vi vay luon co gioi han thoi gian cho va bo qua loi neu co.
  */
 async function openProfileForManualLogin(browserProfilePath) {
   const context = await launchProfile(browserProfilePath, { headless: false })
   const page = context.pages()[0] || (await context.newPage())
-  await page.goto('https://www.facebook.com/', { waitUntil: 'domcontentloaded' })
+  try {
+    await page.goto('https://www.facebook.com/', { waitUntil: 'domcontentloaded', timeout: 15000 })
+  } catch (err) {
+    // Bo qua - cua so van mo binh thuong, nguoi dung tu go dia chi can vao.
+  }
   return context
 }
 
@@ -73,6 +83,35 @@ async function checkLoginStatus(browserProfilePath, { headless = true, screensho
     const isLoggedOut = await existsAny(page, selectors.loginIndicators.loggedOut)
     if (isLoggedOut) return 'CHUA_DANG_NHAP'
 
+    return 'KHONG_XAC_DINH'
+  } catch (err) {
+    return 'KHONG_XAC_DINH'
+  } finally {
+    if (context) await context.close().catch(() => {})
+  }
+}
+
+/**
+ * Kiem tra dang nhap TikTok RIENG (khong dung chung voi checkLoginStatus vi
+ * ham do chi kiem tra Facebook) - dung cho tai khoan chi dung TikTok, khong
+ * lien quan Facebook. Thay vi do tim selector DOM (de lech theo giao dien
+ * TikTok doi), kiem tra qua URL sau khi dieu huong: TikTok Studio la khu vuc
+ * chi vao duoc khi da dang nhap, se tu redirect ve trang dang nhap neu chua.
+ * Tra ve: 'DA_DANG_NHAP' | 'CHUA_DANG_NHAP' | 'KHONG_XAC_DINH'
+ */
+async function checkTiktokLoginStatus(browserProfilePath, { headless = true } = {}) {
+  let context
+  try {
+    context = await launchProfile(browserProfilePath, { headless })
+    const page = context.pages()[0] || (await context.newPage())
+    await page.goto('https://www.tiktok.com/tiktokstudio/upload?lang=vi-VN', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    })
+    await page.waitForTimeout(2000)
+    const url = page.url()
+    if (url.includes('/login')) return 'CHUA_DANG_NHAP'
+    if (url.includes('tiktokstudio')) return 'DA_DANG_NHAP'
     return 'KHONG_XAC_DINH'
   } catch (err) {
     return 'KHONG_XAC_DINH'
@@ -124,4 +163,4 @@ async function safeScreenshot(page, dir, prefix) {
   }
 }
 
-module.exports = { launchProfile, openProfileForManualLogin, checkLoginStatus, checkGroupAccess, safeScreenshot }
+module.exports = { launchProfile, openProfileForManualLogin, checkLoginStatus, checkTiktokLoginStatus, checkGroupAccess, safeScreenshot }

@@ -412,7 +412,7 @@ export default function CreatePost() {
               <div key={acc.id} className="checkbox-row">
                 <input type="checkbox" id={`acc-${acc.id}`} checked={selectedAccountIds.has(acc.id)} onChange={() => toggleAccount(acc.id)} />
                 <label htmlFor={`acc-${acc.id}`} style={{ margin: 0, fontWeight: 400, color: 'var(--text)' }}>
-                  {acc.display_name} {acc.login_status !== 'DA_DANG_NHAP' && <span className="badge badge-amber">chưa xác nhận đăng nhập</span>}
+                  {acc.display_name} {acc.login_status !== 'DA_DANG_NHAP' && acc.tiktok_login_status !== 'DA_DANG_NHAP' && <span className="badge badge-amber">chưa xác nhận đăng nhập</span>}
                 </label>
               </div>
             ))}

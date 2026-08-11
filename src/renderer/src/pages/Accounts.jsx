@@ -11,6 +11,7 @@ export default function Accounts() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [checkingId, setCheckingId] = useState(null)
+  const [checkingTiktokId, setCheckingTiktokId] = useState(null)
 
   async function load() {
     setLoading(true)
@@ -101,12 +102,25 @@ export default function Accounts() {
     setCheckingId(acc.id)
     try {
       await window.api.accounts.checkLoginStatus(acc.id)
-      toast.info(`Đã kiểm tra trạng thái đăng nhập cho "${acc.display_name}".`)
+      toast.info(`Đã kiểm tra trạng thái đăng nhập Facebook cho "${acc.display_name}".`)
       load()
     } catch (err) {
       toast.error(err.message)
     } finally {
       setCheckingId(null)
+    }
+  }
+
+  async function checkTiktokLogin(acc) {
+    setCheckingTiktokId(acc.id)
+    try {
+      await window.api.accounts.checkTiktokLoginStatus(acc.id)
+      toast.info(`Đã kiểm tra trạng thái đăng nhập TikTok cho "${acc.display_name}".`)
+      load()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setCheckingTiktokId(null)
     }
   }
 
@@ -167,6 +181,7 @@ export default function Accounts() {
               <th>Tên hiển thị</th>
               <th>Chrome Profile</th>
               <th>Đăng nhập</th>
+              <th>Đăng nhập TikTok</th>
               <th>Hoạt động</th>
               <th>Bài đã đăng hôm nay</th>
               <th>Đăng gần nhất</th>
@@ -177,10 +192,10 @@ export default function Accounts() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={9} className="empty-state">Đang tải...</td></tr>
+              <tr><td colSpan={10} className="empty-state">Đang tải...</td></tr>
             )}
             {!loading && accounts.length === 0 && (
-              <tr><td colSpan={9} className="empty-state">Chưa có tài khoản nào. Nhấn "+ Thêm tài khoản" để bắt đầu.</td></tr>
+              <tr><td colSpan={10} className="empty-state">Chưa có tài khoản nào. Nhấn "+ Thêm tài khoản" để bắt đầu.</td></tr>
             )}
             {accounts.map((acc) => (
               <tr key={acc.id}>
@@ -189,6 +204,11 @@ export default function Accounts() {
                 <td>
                   <span className={`badge badge-${acc.login_status === 'DA_DANG_NHAP' ? 'green' : acc.login_status === 'YEU_CAU_XAC_MINH' || acc.login_status === 'HET_PHIEN' ? 'amber' : 'gray'}`}>
                     {LOGIN_STATUS_LABEL_VI[acc.login_status] || acc.login_status}
+                  </span>
+                </td>
+                <td>
+                  <span className={`badge badge-${acc.tiktok_login_status === 'DA_DANG_NHAP' ? 'green' : acc.tiktok_login_status === 'CHUA_DANG_NHAP' ? 'amber' : 'gray'}`}>
+                    {acc.tiktok_login_status ? (LOGIN_STATUS_LABEL_VI[acc.tiktok_login_status] || acc.tiktok_login_status) : 'Chưa kiểm tra'}
                   </span>
                 </td>
                 <td>
@@ -209,6 +229,9 @@ export default function Accounts() {
                     <button className="btn btn-sm" onClick={() => openForLogin(acc)}>Mở để đăng nhập</button>
                     <button className="btn btn-sm" disabled={checkingId === acc.id} onClick={() => checkLogin(acc)}>
                       {checkingId === acc.id ? 'Đang kiểm tra...' : 'Kiểm tra đăng nhập'}
+                    </button>
+                    <button className="btn btn-sm" disabled={checkingTiktokId === acc.id} onClick={() => checkTiktokLogin(acc)}>
+                      {checkingTiktokId === acc.id ? 'Đang kiểm tra...' : 'Kiểm tra TikTok'}
                     </button>
                     <button className="btn btn-sm" onClick={() => openEdit(acc)}>Sửa</button>
                     <button className="btn btn-sm" onClick={() => togglePause(acc)}>

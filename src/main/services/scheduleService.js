@@ -56,12 +56,14 @@ function create(payload) {
   const db = getDb()
   const tx = db.transaction(() => {
     const info = db.prepare(`
-      INSERT INTO post_schedules (time_of_day, label, enabled, dry_run)
-      VALUES (@time_of_day, @label, 1, @dry_run)
+      INSERT INTO post_schedules (time_of_day, label, enabled, dry_run, video_library_id, custom_content)
+      VALUES (@time_of_day, @label, 1, @dry_run, @video_library_id, @custom_content)
     `).run({
       time_of_day: payload.time_of_day,
       label: payload.label || null,
-      dry_run: payload.dry_run ? 1 : 0
+      dry_run: payload.dry_run ? 1 : 0,
+      video_library_id: payload.video_library_id || null,
+      custom_content: payload.custom_content || null
     })
     const scheduleId = info.lastInsertRowid
     const insertTarget = db.prepare(`
@@ -93,6 +95,8 @@ function update(id, data) {
       label = @label,
       enabled = @enabled,
       dry_run = @dry_run,
+      video_library_id = @video_library_id,
+      custom_content = @custom_content,
       last_fired_date = @last_fired_date,
       last_fired_status = @last_fired_status,
       last_fired_message = @last_fired_message,

@@ -1,29 +1,29 @@
-const settingsService = require('./settingsService')
-const { hashPassword, verifyPassword } = require('./passwordUtil')
+const serverClient = require('./serverClient')
 
-const ADMIN_KEY = 'admin_password_hash'
+// Doi tu settings.admin_password_hash cuc bo sang goi HTTP toi may chu
+// trung tam - GIU NGUYEN 3 ham xuat ra de src/main/index.js khong can sua gi.
 
 function hasAdminPassword() {
-  return !!settingsService.get(ADMIN_KEY)
+  return serverClient
+    .apiFetch('/api/auth/has-admin-password')
+    .then((res) => res.hasAdminPassword)
 }
 
-function setAdminPassword(currentPassword, newPassword) {
-  if (!newPassword) throw new Error('Mật khẩu Admin mới không được để trống.')
-  const existing = settingsService.get(ADMIN_KEY)
-  if (existing) {
-    if (!verifyPassword(currentPassword || '', existing)) {
-      throw new Error('Mật khẩu Admin hiện tại không đúng.')
-    }
-  }
-  settingsService.set(ADMIN_KEY, hashPassword(newPassword))
+async function setAdminPassword(currentPassword, newPassword) {
+  const res = await serverClient.apiFetch('/api/auth/admin-password', {
+    method: 'POST',
+    body: { currentPassword, newPassword }
+  })
+  if (res.token) serverClient.setToken(res.token)
   return true
 }
 
-function loginAdmin(password) {
-  const stored = settingsService.get(ADMIN_KEY)
-  if (!verifyPassword(password || '', stored)) {
-    throw new Error('Mật khẩu Admin không đúng.')
-  }
+async function loginAdmin(password) {
+  const res = await serverClient.apiFetch('/api/auth/login/admin', {
+    method: 'POST',
+    body: { password }
+  })
+  serverClient.setToken(res.token)
   return { role: 'admin' }
 }
 

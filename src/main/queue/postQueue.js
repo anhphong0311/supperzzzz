@@ -5,7 +5,7 @@ const postService = require('../services/postService')
 const accountService = require('../services/accountService')
 const settingsService = require('../services/settingsService')
 const logService = require('../services/logService')
-const { launchProfile } = require('../automation/browserManager')
+const { launchProfile, safeScreenshot } = require('../automation/browserManager')
 const facebookAutomation = require('../automation/postAutomation')
 const instagramAutomation = require('../automation/instagramAutomation')
 const tiktokAutomation = require('../automation/tiktokAutomation')
@@ -245,6 +245,7 @@ class PostQueue extends EventEmitter {
           } else {
             postService.updateJob(job.id, { status: JOB_STATUS.FAILED, error_code: 'UNKNOWN_ERROR', error_message: err.message })
             log(job.id, 'ERROR', `Lỗi không xác định: ${err.message}`)
+            await safeScreenshot(page, screenshotDir, 'unknown-error').catch(() => {})
           }
         }
 

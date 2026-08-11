@@ -190,6 +190,10 @@ function ScheduleForm({ scheduleId, onClose, onSaved }) {
   const [timeOfDay, setTimeOfDay] = useState('08:00')
   const [label, setLabel] = useState('')
   const [dryRun, setDryRun] = useState(true)
+  const [videoMode, setVideoMode] = useState('auto') // 'auto' | 'specific'
+  const [videoLibraryId, setVideoLibraryId] = useState('')
+  const [customContent, setCustomContent] = useState('')
+  const [videos, setVideos] = useState([])
   const [accounts, setAccounts] = useState([])
   const [selectedAccountIds, setSelectedAccountIds] = useState(new Set())
   const [groupsByAccount, setGroupsByAccount] = useState({})
@@ -202,6 +206,7 @@ function ScheduleForm({ scheduleId, onClose, onSaved }) {
 
   useEffect(() => {
     window.api.accounts.list().then(setAccounts).catch((err) => toast.error(err.message))
+    window.api.videoLibrary.list().then(setVideos).catch((err) => toast.error(err.message))
   }, [])
 
   useEffect(() => {
@@ -210,6 +215,9 @@ function ScheduleForm({ scheduleId, onClose, onSaved }) {
       setTimeOfDay(s.time_of_day)
       setLabel(s.label || '')
       setDryRun(!!s.dry_run)
+      setVideoMode(s.video_library_id ? 'specific' : 'auto')
+      setVideoLibraryId(s.video_library_id || '')
+      setCustomContent(s.custom_content || '')
       const accIds = new Set()
       const groupSel = {}
       const timelineSel = new Set()
@@ -319,16 +327,21 @@ function ScheduleForm({ scheduleId, onClose, onSaved }) {
 
   async function save() {
     if (!/^\d{2}:\d{2}$/.test(timeOfDay)) return toast.error('Giờ đăng không hợp lệ.')
+    if (videoMode === 'specific' && !videoLibraryId) return toast.error('Vui lòng chọn video cụ thể cho lịch này.')
     const targets = buildTargets()
     if (targets.length === 0) return toast.error('Chưa chọn đích đăng nào.')
     setSaving(true)
+    const videoFields = {
+      video_library_id: videoMode === 'specific' ? Number(videoLibraryId) : null,
+      custom_content: customContent.trim() || null
+    }
     try {
       if (scheduleId) {
-        await window.api.schedules.update(scheduleId, { time_of_day: timeOfDay, label, dry_run: dryRun ? 1 : 0 })
+        await window.api.schedules.update(scheduleId, { time_of_day: timeOfDay, label, dry_run: dryRun ? 1 : 0, ...videoFields })
         await window.api.schedules.setTargets(scheduleId, targets)
         toast.info('Đã cập nhật lịch.')
       } else {
-        await window.api.schedules.create({ time_of_day: timeOfDay, label, dry_run: dryRun, targets })
+        await window.api.schedules.create({ time_of_day: timeOfDay, label, dry_run: dryRun, targets, ...videoFields })
         toast.info('Đã tạo lịch mới.')
       }
       onSaved()
@@ -360,6 +373,41 @@ function ScheduleForm({ scheduleId, onClose, onSaved }) {
           <label htmlFor="sched-dry-run" style={{ margin: 0, fontWeight: 400, color: 'var(--text)' }}>
             Chạy thử DRY_RUN (chưa đăng thật - dùng để kiểm tra lịch trước)
           </label>
+        </div>
+
+        <div className="section-title">Video sẽ đăng</div>
+        <div className="checkbox-row">
+          <input type="radio" id="sched-video-auto" name="sched-video-mode" checked={videoMode === 'auto'} onChange={() => setVideoMode('auto')} />
+          <label htmlFor="sched-video-auto" style={{ margin: 0, fontWeight: 400, color: 'var(--text)' }}>
+            Tự động lấy video kế tiếp trong Kho video (như trước)
+          </label>
+        </div>
+        <div className="checkbox-row">
+          <input type="radio" id="sched-video-specific" name="sched-video-mode" checked={videoMode === 'specific'} onChange={() => setVideoMode('specific')} />
+          <label htmlFor="sched-video-specific" style={{ margin: 0, fontWeight: 400, color: 'var(--text)' }}>
+            Chọn đúng 1 video cụ thể
+          </label>
+        </div>
+        {videoMode === 'specific' && (
+          <div className="field" style={{ marginLeft: 24 }}>
+            <label>Video</label>
+            <select value={videoLibraryId} onChange={(e) => setVideoLibraryId(e.target.value)}>
+              <option value="">-- Chọn video --</option>
+              {videos.map((v) => (
+                <option key={v.id} value={v.id}>{v.caption_hint || `Video #${v.id}`} ({v.status})</option>
+              ))}
+            </select>
+            <div className="hint">Sau khi đăng thật thành công, lịch này sẽ tự tắt để không đăng lặp lại đúng video đó.</div>
+          </div>
+        )}
+        <div className="field">
+          <label>Nội dung tuỳ chỉnh cho lịch này (tuỳ chọn)</label>
+          <textarea
+            rows={3}
+            value={customContent}
+            onChange={(e) => setCustomContent(e.target.value)}
+            placeholder="Để trống sẽ dùng gợi ý nội dung từ cột &quot;Tên video&quot; trên Google Sheet"
+          />
         </div>
 
         <div className="section-title">Đích đăng</div>

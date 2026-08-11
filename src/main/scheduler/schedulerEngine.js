@@ -106,9 +106,19 @@ class SchedulerEngine extends EventEmitter {
       this.log(`Không đồng bộ được Google Sheet trước khi đăng: ${err.message} (vẫn tiếp tục với dữ liệu cũ)`)
     }
 
-    let video = videoLibraryService.pickNextPending()
-    if (!video) {
-      return { status: 'NO_VIDEO', message: 'Không có video nào sẵn sàng để đăng trong Kho video.' }
+    // Neu lich da gan san 1 video cu the (khong phai "tu dong lay video ke
+    // tiep") thi luon dung dung video do, khong lay tu hang cho chung.
+    let video
+    if (schedule.video_library_id) {
+      video = videoLibraryService.get(schedule.video_library_id)
+      if (!video) {
+        return { status: 'FAILED', message: 'Video đã gán cho lịch này không còn tồn tại trong Kho video.' }
+      }
+    } else {
+      video = videoLibraryService.pickNextPending()
+      if (!video) {
+        return { status: 'NO_VIDEO', message: 'Không có video nào sẵn sàng để đăng trong Kho video.' }
+      }
     }
 
     if (!video.local_file_path) {
@@ -123,7 +133,7 @@ class SchedulerEngine extends EventEmitter {
     const settings = settingsService.getAll()
     const payload = {
       campaign_name: `Lịch tự động ${schedule.time_of_day} - ${video.caption_hint || `Video #${video.id}`}`,
-      content: video.caption_hint || '',
+      content: schedule.custom_content || video.caption_hint || '',
       dry_run: !!schedule.dry_run,
       delay_seconds: Number(settings.delay_between_posts_seconds || 30),
       performed_by: 'Tự động (Lịch)',
@@ -188,6 +198,16 @@ class SchedulerEngine extends EventEmitter {
       return { status: 'OK', message: `Đã chạy thử DRY_RUN cho video "${video.caption_hint || video.id}".` }
     }
     if (successJob) {
+      // Lich gan voi 1 video CU THE (khong phai "tu dong lay video ke tiep")
+      // thi tu tat sau khi da dang that thanh cong, tranh dang lap lai dung
+      // video do vao lan chay ke tiep.
+      if (schedule.video_library_id) {
+        try {
+          scheduleService.setEnabled(schedule.id, false)
+        } catch (err) {
+          this.log(`Không tự tắt được lịch sau khi đăng xong: ${err.message}`)
+        }
+      }
       return { status: 'OK', message: `Đã đăng thành công video "${video.caption_hint || video.id}".` }
     }
     return { status: 'FAILED', message: failedJob ? (failedJob.error_message || 'Đăng thất bại.') : 'Không xác định được kết quả.' }

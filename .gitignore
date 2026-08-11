@@ -9,3 +9,6 @@ data/uploads/
 *.log
 .DS_Store
 .claude/
+server/.env
+server/local.db
+server/local.db-*

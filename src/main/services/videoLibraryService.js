@@ -157,7 +157,11 @@ async function writeBackToSheet(id) {
   if (!video) throw new Error(`Không tìm thấy video id=${id}`)
   const cfg = getSheetConfig()
   const resultUrl = video.facebook_post_url || video.instagram_post_url || video.threads_post_url || video.tiktok_post_url || ''
-  const done = !!resultUrl
+  // KHONG duoc dung "co resultUrl hay khong" de tinh done - TikTok (khac
+  // Facebook) khong lay duoc link bai dang tu dong nen tiktok_post_url luon
+  // rong ke ca khi da dang thanh cong that, se khien cot "Da dang" tren
+  // Sheet luon bao FALSE sai. Dung thang trang thai da luu trong DB.
+  const done = video.status === 'DA_DANG'
   await sheetsApi.writeRowResult(cfg, video.sheet_row_number, { resultUrl, done })
   return true
 }

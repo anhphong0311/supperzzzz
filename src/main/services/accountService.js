@@ -53,6 +53,7 @@ function update(id, data) {
       profile_name = @profile_name,
       browser_profile_path = @browser_profile_path,
       login_status = @login_status,
+      tiktok_login_status = @tiktok_login_status,
       account_status = @account_status,
       posts_today = @posts_today,
       last_posted_at = @last_posted_at,
@@ -73,6 +74,10 @@ function remove(id) {
 
 function setLoginStatus(id, loginStatus) {
   return update(id, { login_status: loginStatus, last_checked_at: nowIso() })
+}
+
+function setTiktokLoginStatus(id, tiktokLoginStatus) {
+  return update(id, { tiktok_login_status: tiktokLoginStatus, last_checked_at: nowIso() })
 }
 
 function setAccountStatus(id, accountStatus) {
@@ -130,6 +135,7 @@ module.exports = {
   update,
   remove,
   setLoginStatus,
+  setTiktokLoginStatus,
   setAccountStatus,
   incrementPostsToday,
   resetDailyCounters,

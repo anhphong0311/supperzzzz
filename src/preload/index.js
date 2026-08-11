@@ -44,7 +44,8 @@ const api = {
     setStatus: (id, status) => call('accounts:setStatus', id, status),
     pickProfileFolder: () => call('accounts:pickProfileFolder'),
     openProfileForLogin: (id) => call('accounts:openProfileForLogin', id),
-    checkLoginStatus: (id) => call('accounts:checkLoginStatus', id)
+    checkLoginStatus: (id) => call('accounts:checkLoginStatus', id),
+    checkTiktokLoginStatus: (id) => call('accounts:checkTiktokLoginStatus', id)
   },
   groups: {
     list: (filters) => call('groups:list', filters),
@@ -123,6 +124,13 @@ const api = {
   system: {
     openExternal: (url) => call('system:openExternal', url),
     getDataDir: () => call('system:getDataDir')
+  },
+  competitor: {
+    list: () => call('competitor:list'),
+    create: (data) => call('competitor:create', data),
+    remove: (id) => call('competitor:remove', id),
+    priceHistory: (id) => call('competitor:priceHistory', id),
+    addPriceEntry: (id, data) => call('competitor:addPriceEntry', id, data)
   }
 }
 

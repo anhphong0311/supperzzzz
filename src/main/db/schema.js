@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS facebook_accounts (
   display_name TEXT NOT NULL,
   profile_name TEXT NOT NULL,
   browser_profile_path TEXT NOT NULL,
-  login_status TEXT NOT NULL DEFAULT 'CHUA_DANG_NHAP',
+  login_status TEXT NOT NULL DEFAULT 'CHUA_DANG_NHAP', -- trang thai dang nhap FACEBOOK
+  tiktok_login_status TEXT, -- trang thai dang nhap TIKTOK rieng (NULL = chua kiem tra)
   account_status TEXT NOT NULL DEFAULT 'HOAT_DONG',
   posts_today INTEGER NOT NULL DEFAULT 0,
   last_posted_at TEXT,
@@ -153,6 +154,8 @@ CREATE TABLE IF NOT EXISTS post_schedules (
   label TEXT,
   enabled INTEGER NOT NULL DEFAULT 1,
   dry_run INTEGER NOT NULL DEFAULT 0,
+  video_library_id INTEGER REFERENCES video_library(id), -- NULL = tu lay "video ke tiep" nhu cu; co gia tri = dung dung video nay
+  custom_content TEXT, -- NULL = dung caption_hint cua video nhu cu; co gia tri = ghi de noi dung rieng cho lich nay
   last_fired_date TEXT, -- 'YYYY-MM-DD' - tranh chay lap trong cung 1 ngay
   last_fired_status TEXT,
   last_fired_message TEXT,
@@ -169,6 +172,30 @@ CREATE TABLE IF NOT EXISTS post_schedule_targets (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Theo doi gia san pham doi thu (module doc lap - xem src/main/priceTracking/).
+-- Bat/tat qua settings.price_tracking_enabled, khong anh huong gi den phan
+-- con lai cua app khi tat.
+CREATE TABLE IF NOT EXISTS competitor_products (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_name TEXT NOT NULL,
+  product_url TEXT NOT NULL UNIQUE,
+  platform TEXT NOT NULL DEFAULT 'shopee',
+  last_checked_at TEXT,
+  last_status TEXT, -- CHUA_KIEM_TRA | OK | LOI | CAN_DANG_NHAP_LAI
+  last_error_message TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS competitor_price_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  competitor_product_id INTEGER NOT NULL REFERENCES competitor_products(id) ON DELETE CASCADE,
+  listed_price INTEGER,
+  voucher_amount INTEGER,
+  final_price INTEGER,
+  recorded_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_schedule_targets_schedule ON post_schedule_targets(schedule_id);
 CREATE INDEX IF NOT EXISTS idx_video_library_status ON video_library(status);
 CREATE INDEX IF NOT EXISTS idx_account_groups_account ON account_groups(account_id);
@@ -178,4 +205,5 @@ CREATE INDEX IF NOT EXISTS idx_post_jobs_account ON post_jobs(account_id);
 CREATE INDEX IF NOT EXISTS idx_post_jobs_group ON post_jobs(group_id);
 CREATE INDEX IF NOT EXISTS idx_post_jobs_status ON post_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_post_logs_job ON post_logs(post_job_id);
+CREATE INDEX IF NOT EXISTS idx_competitor_price_history_product ON competitor_price_history(competitor_product_id);
 `

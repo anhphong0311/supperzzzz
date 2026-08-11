@@ -1,124 +1,74 @@
-const { getDb } = require('../db/database')
-const { hashPassword, verifyPassword } = require('./passwordUtil')
+const serverClient = require('./serverClient')
 
-function nowIso() {
-  return new Date().toISOString()
-}
+// Doi tu doc SQLite cuc bo sang goi HTTP toi may chu trung tam - GIU NGUYEN
+// ten/chu ky ham xuat ra de src/main/index.js (IPC handlers) khong can sua gi.
+// Xem plan: C:\Users\Admin\.claude\plans\velvet-imagining-petal.md
 
 function list() {
-  const db = getDb()
-  return db.prepare('SELECT id, username, display_name, status, role, wizard_completed, created_at FROM staff_users ORDER BY id DESC').all()
+  return serverClient.apiFetch('/api/staff', { auth: true })
 }
 
 function get(id) {
-  const db = getDb()
-  return db.prepare('SELECT id, username, display_name, status, role, wizard_completed, created_at FROM staff_users WHERE id = ?').get(id)
-}
-
-function getByUsername(username) {
-  const db = getDb()
-  return db.prepare('SELECT * FROM staff_users WHERE username = ?').get(username)
-}
-
-function insert({ username, display_name, password, status }) {
-  if (!username || !username.trim()) throw new Error('Vui lòng nhập tên đăng nhập.')
-  if (!display_name || !display_name.trim()) throw new Error('Vui lòng nhập tên hiển thị.')
-  if (!password) throw new Error('Vui lòng nhập mật khẩu.')
-  const db = getDb()
-  try {
-    const info = db.prepare(`
-      INSERT INTO staff_users (username, display_name, password_hash, status)
-      VALUES (@username, @display_name, @password_hash, @status)
-    `).run({
-      username: username.trim(),
-      display_name: display_name.trim(),
-      password_hash: hashPassword(password),
-      status
-    })
-    return get(info.lastInsertRowid)
-  } catch (err) {
-    if (String(err.message).includes('UNIQUE')) {
-      throw new Error('Tên đăng nhập đã tồn tại.')
-    }
-    throw err
-  }
+  return list().then((rows) => rows.find((r) => r.id === id) || null)
 }
 
 // Admin tao truc tiep (trang Tai khoan Nhan vien) - vao thang duoc ngay.
-function create({ username, display_name, password }) {
-  return insert({ username, display_name, password, status: 'ACTIVE' })
+function create(data) {
+  return serverClient.apiFetch('/api/staff', { method: 'POST', body: data, auth: true })
 }
 
 // Nhan vien tu dang ky tu man hinh dang nhap - phai cho Admin duyet.
-function register({ username, display_name, password }) {
-  return insert({ username, display_name, password, status: 'PENDING' })
+function register(data) {
+  return serverClient.apiFetch('/api/auth/register', { method: 'POST', body: data })
 }
 
 function approve(id) {
-  return setStatus(id, 'ACTIVE')
+  return serverClient.apiFetch(`/api/staff/${id}/approve`, { method: 'POST', auth: true })
+}
+
+function update(id, data) {
+  return serverClient.apiFetch(`/api/staff/${id}`, { method: 'PATCH', body: data, auth: true })
 }
 
 function setStatus(id, status) {
-  const db = getDb()
-  const current = get(id)
-  if (!current) throw new Error(`Không tìm thấy nhân viên id=${id}`)
-  db.prepare('UPDATE staff_users SET status = @status, updated_at = @updated_at WHERE id = @id')
-    .run({ id, status, updated_at: nowIso() })
-  return get(id)
+  return serverClient.apiFetch(`/api/staff/${id}/status`, { method: 'POST', body: { status }, auth: true })
 }
 
 function setRole(id, role) {
-  if (role !== 'STAFF' && role !== 'ADMIN') throw new Error('Vai trò không hợp lệ.')
-  const db = getDb()
-  const current = get(id)
-  if (!current) throw new Error(`Không tìm thấy nhân viên id=${id}`)
-  db.prepare('UPDATE staff_users SET role = @role, updated_at = @updated_at WHERE id = @id')
-    .run({ id, role, updated_at: nowIso() })
-  return get(id)
+  return serverClient.apiFetch(`/api/staff/${id}/role`, { method: 'POST', body: { role }, auth: true })
 }
 
+// Nhan vien tu goi cho CHINH HO sau khi hoan tat wizard - server chap nhan
+// ca token Admin lan token cua chinh nhan vien do (khong bat buoc phai la
+// Admin), nen van goi voi auth:true (dinh kem token dang co, du la loai nao).
 function markWizardDone(id) {
-  const db = getDb()
-  const current = get(id)
-  if (!current) throw new Error(`Không tìm thấy nhân viên id=${id}`)
-  db.prepare('UPDATE staff_users SET wizard_completed = 1, updated_at = @updated_at WHERE id = @id')
-    .run({ id, updated_at: nowIso() })
-  return get(id)
-}
-
-function update(id, { display_name }) {
-  const db = getDb()
-  const current = get(id)
-  if (!current) throw new Error(`Không tìm thấy nhân viên id=${id}`)
-  db.prepare('UPDATE staff_users SET display_name = @display_name, updated_at = @updated_at WHERE id = @id')
-    .run({ id, display_name: (display_name || '').trim() || current.display_name, updated_at: nowIso() })
-  return get(id)
+  return serverClient.apiFetch(`/api/staff/${id}/wizard-done`, { method: 'POST', auth: true })
 }
 
 function resetPassword(id, newPassword) {
-  if (!newPassword) throw new Error('Vui lòng nhập mật khẩu mới.')
-  const db = getDb()
-  const current = get(id)
-  if (!current) throw new Error(`Không tìm thấy nhân viên id=${id}`)
-  db.prepare('UPDATE staff_users SET password_hash = @password_hash, updated_at = @updated_at WHERE id = @id')
-    .run({ id, password_hash: hashPassword(newPassword), updated_at: nowIso() })
-  return get(id)
+  return serverClient.apiFetch(`/api/staff/${id}/reset-password`, {
+    method: 'POST',
+    body: { newPassword },
+    auth: true
+  })
 }
 
 function remove(id) {
-  const db = getDb()
-  db.prepare('DELETE FROM staff_users WHERE id = ?').run(id)
-  return true
+  return serverClient.apiFetch(`/api/staff/${id}`, { method: 'DELETE', auth: true })
 }
 
-function login(username, password) {
-  const row = getByUsername((username || '').trim())
-  const invalid = () => new Error('Sai tên đăng nhập hoặc mật khẩu.')
-  if (!row) throw invalid()
-  if (row.status === 'PENDING') throw new Error('Tài khoản đang chờ Quản trị viên phê duyệt.')
-  if (row.status !== 'ACTIVE') throw invalid()
-  if (!verifyPassword(password || '', row.password_hash)) throw invalid()
-  return { id: row.id, username: row.username, display_name: row.display_name, wizard_completed: row.wizard_completed, role: row.role }
+async function login(username, password) {
+  const identity = await serverClient.apiFetch('/api/auth/login/staff', {
+    method: 'POST',
+    body: { username, password }
+  })
+  // Nhan vien duoc thang vai tro ADMIN (setRole) van dang nhap qua day (khong
+  // qua man Admin) - token cua ho van dung de goi cac route quan tri, vi
+  // server tu cap dung quyen theo role luu trong DB, khong phai theo cach
+  // dang nhap. Luu token nay lam token "hien hanh" de cac thao tac quan tri
+  // tiep theo (vi du StaffAccounts.jsx) hoat dong duoc trong phien nay.
+  if (identity.token) serverClient.setToken(identity.token)
+  return identity
 }
 
 module.exports = {
