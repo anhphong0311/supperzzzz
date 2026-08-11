@@ -95,6 +95,18 @@ module.exports = {
     ]
   },
 
+  // Trang "Quan ly bai dang" cua TikTok Studio - dung de lay link that cua
+  // video VUA dang xong (best-effort, CHUA kiem chung tren giao dien that -
+  // TikTok co the doi cau truc bat ky luc nao). Neu khong lay duoc, tool van
+  // coi la dang thanh cong, chi de trong link (khong lam that bai ca job).
+  postsManagement: {
+    firstPostLink: [
+      'a[href*="/video/"]',
+      'div[data-e2e*="video-item" i] a[href*="/video/"]',
+      'a[data-e2e*="video-card" i]'
+    ]
+  },
+
   postResult: {
     successIndicators: [
       'text=/your video has been uploaded/i',

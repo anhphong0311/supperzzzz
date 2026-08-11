@@ -5,6 +5,30 @@ const { JOB_STATUS, ERROR_CODES } = require('./statusCodes')
 const { ManualInterventionError, JobExecutionError } = require('./postAutomation')
 
 /**
+ * Sau khi dang xong, thu vao trang "Quan ly bai dang" cua TikTok Studio de
+ * lay link video VUA dang (video moi nhat, o dau danh sach). BEST-EFFORT -
+ * CHUA kiem chung tren giao dien that, va du that bai cung KHONG duoc lam
+ * hong ket qua da dang thanh cong (chi de postUrl = null nhu truoc gio).
+ */
+async function tryFetchLatestPostUrl(page, log) {
+  try {
+    await page.goto('https://www.tiktok.com/tiktokstudio/content?lang=vi-VN', {
+      waitUntil: 'domcontentloaded',
+      timeout: 15000
+    })
+    await page.waitForTimeout(2000)
+    const link = await findFirst(page, selectors.postsManagement.firstPostLink, { timeoutPerCandidate: 3000 })
+    if (!link) return null
+    const href = await link.getAttribute('href')
+    if (!href) return null
+    return href.startsWith('http') ? href : `https://www.tiktok.com${href}`
+  } catch (err) {
+    log?.('INFO', 'Không tự lấy được link bài đăng TikTok thật (best-effort) - để trống link.')
+    return null
+  }
+}
+
+/**
  * Dang 1 video len TikTok qua giao dien web (tiktok.com/upload) - KHONG
  * dung API chinh thuc. Luu y:
  *   - Tai khoan phai da duoc dang nhap TikTok THU CONG trong DUNG Chrome
@@ -203,7 +227,8 @@ async function executeJob({ page, content, mediaPaths = [], dryRun, timeouts, sc
   const success = await existsAny(page, selectors.postResult.successIndicators, { timeout: 4000 })
   if (success) {
     log('INFO', 'TikTok đã xác nhận đăng video thành công.')
-    return { status: JOB_STATUS.POSTED, postUrl: null, screenshotPath: null }
+    const postUrl = await tryFetchLatestPostUrl(page, log)
+    return { status: JOB_STATUS.POSTED, postUrl, screenshotPath: null }
   }
 
   // Khong thay thong bao xac nhan RO RANG - truoc day code mac dinh coi day
@@ -221,9 +246,8 @@ async function executeJob({ page, content, mediaPaths = [], dryRun, timeouts, sc
   }
 
   log('INFO', 'Không thấy thông báo xác nhận rõ ràng, nhưng trang đã rời khỏi form đăng - coi như đã tiếp nhận thao tác đăng.')
-  // TikTok khong luon hien link video ngay - best-effort, khong dam bao lay
-  // duoc URL that (giong Instagram).
-  return { status: JOB_STATUS.POSTED, postUrl: null, screenshotPath: null }
+  const postUrl = await tryFetchLatestPostUrl(page, log)
+  return { status: JOB_STATUS.POSTED, postUrl, screenshotPath: null }
 }
 
 /**
