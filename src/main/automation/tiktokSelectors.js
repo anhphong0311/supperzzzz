@@ -100,10 +100,30 @@ module.exports = {
   // TikTok co the doi cau truc bat ky luc nao). Neu khong lay duoc, tool van
   // coi la dang thanh cong, chi de trong link (khong lam that bai ca job).
   postsManagement: {
+    // Thu truoc: neu dong video dau tien co san the <a> tro thang toi link
+    // that (hiem khi dung - da xac nhan qua thuc te dong video KHONG phai
+    // the <a>, ma la 1 hang trong bang co nut "..." rieng).
     firstPostLink: [
       'a[href*="/video/"]',
       'div[data-e2e*="video-item" i] a[href*="/video/"]',
       'a[data-e2e*="video-card" i]'
+    ],
+    // Neu khong co <a> that, phai bam nut "..." (more actions) o CUOI hang
+    // dau tien trong bang danh sach bai dang de mo menu.
+    firstPostMoreButton: [
+      'tbody tr:first-child button[aria-label*="more" i]',
+      'tbody tr:first-child button[aria-label*="thêm" i]',
+      'tbody tr:first-child [data-e2e*="more" i]',
+      'tbody tr:first-child button:last-of-type'
+    ],
+    // Trong menu vua mo tu nut "...", tim muc "Sao chep lien ket"/"Copy link".
+    copyLinkMenuItem: [
+      'div[role="menuitem"]:has-text("Sao chép liên kết")',
+      'div[role="menuitem"]:has-text("Copy link")',
+      'li:has-text("Sao chép liên kết")',
+      'li:has-text("Copy link")',
+      'text=/sao chép liên kết/i',
+      'text=/copy link/i'
     ]
   },
 

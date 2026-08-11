@@ -1,6 +1,6 @@
 {
   "name": "fb-multi-poster",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "Cong cu ho tro dang bai len nhieu nhom Facebook bang nhieu tai khoan (MVP)",
   "private": true,
   "main": "out/main/index.js",

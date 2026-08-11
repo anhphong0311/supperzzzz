@@ -17,11 +17,31 @@ async function tryFetchLatestPostUrl(page, log) {
       timeout: 15000
     })
     await page.waitForTimeout(2000)
+
+    // Cach 1 (hiem gap trong thuc te): dong video co san the <a> tro thang
+    // toi link that.
     const link = await findFirst(page, selectors.postsManagement.firstPostLink, { timeoutPerCandidate: 3000 })
-    if (!link) return null
-    const href = await link.getAttribute('href')
-    if (!href) return null
-    return href.startsWith('http') ? href : `https://www.tiktok.com${href}`
+    if (link) {
+      const href = await link.getAttribute('href')
+      if (href) return href.startsWith('http') ? href : `https://www.tiktok.com${href}`
+    }
+
+    // Cach 2: dong video la 1 hang trong bang, khong co the <a> - phai bam
+    // nut "..." (more actions) roi chon "Sao chep lien ket", sau do doc
+    // clipboard he thong (Electron doc truc tiep, khong can quyen trinh duyet).
+    const moreBtn = await findFirst(page, selectors.postsManagement.firstPostMoreButton, { timeoutPerCandidate: 3000 })
+    if (!moreBtn) return null
+    await moreBtn.click()
+    await page.waitForTimeout(500)
+    const copyItem = await findFirst(page, selectors.postsManagement.copyLinkMenuItem, { timeoutPerCandidate: 3000 })
+    if (!copyItem) return null
+    const { clipboard } = require('electron')
+    clipboard.writeText('') // xoa truoc de chac chan gia tri doc duoc la MOI copy, khong phai rac cu
+    await copyItem.click()
+    await page.waitForTimeout(500)
+    const text = clipboard.readText()
+    if (text && text.includes('tiktok.com')) return text.trim()
+    return null
   } catch (err) {
     log?.('INFO', 'Không tự lấy được link bài đăng TikTok thật (best-effort) - để trống link.')
     return null
