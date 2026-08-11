@@ -3,6 +3,7 @@ import { toast } from '../lib/toast.js'
 import { LOGIN_STATUS_LABEL_VI, ACCOUNT_STATUS_LABEL_VI } from '../constants/statusMap'
 
 const emptyForm = { display_name: '', profile_name: '', browser_profile_path: '', notes: '', fanpage_url: '' }
+const PLATFORM_LABEL = { facebook: 'Facebook', tiktok: 'TikTok', instagram: 'Instagram' }
 
 export default function Accounts() {
   const [accounts, setAccounts] = useState([])
@@ -12,6 +13,7 @@ export default function Accounts() {
   const [form, setForm] = useState(emptyForm)
   const [checkingId, setCheckingId] = useState(null)
   const [checkingTiktokId, setCheckingTiktokId] = useState(null)
+  const [loginPlatformAccount, setLoginPlatformAccount] = useState(null)
 
   async function load() {
     setLoading(true)
@@ -89,10 +91,11 @@ export default function Accounts() {
     }
   }
 
-  async function openForLogin(acc) {
+  async function openForLogin(acc, platform) {
+    setLoginPlatformAccount(null)
     try {
-      toast.info(`Đang mở Chrome Profile của "${acc.display_name}" để đăng nhập thủ công...`)
-      await window.api.accounts.openProfileForLogin(acc.id)
+      toast.info(`Đang mở trang đăng nhập ${PLATFORM_LABEL[platform]} cho "${acc.display_name}"...`)
+      await window.api.accounts.openProfileForLogin(acc.id, platform)
     } catch (err) {
       toast.error(err.message)
     }
@@ -155,7 +158,11 @@ export default function Accounts() {
               khoản) → bấm <strong>"Chọn thư mục"</strong> trong tool và chọn đúng thư mục vừa tạo.
             </div>
           </li>
-          <li>Bấm <strong>Lưu</strong>, sau đó bấm <strong>"Mở để đăng nhập"</strong> — một cửa sổ Chrome thật sẽ mở ra.</li>
+          <li>
+            Bấm <strong>Lưu</strong>, sau đó bấm <strong>"Mở để đăng nhập"</strong> → chọn đúng nền
+            tảng (Facebook/TikTok/Instagram) — một cửa sổ Chrome thật sẽ mở thẳng vào trang đăng
+            nhập của nền tảng đó.
+          </li>
           <li>
             Trong cửa sổ đó, <strong>tự tay đăng nhập</strong> Facebook và/hoặc TikTok/Instagram (nhập
             email/mật khẩu, xử lý xác minh 2 lớp nếu có) rồi đóng cửa sổ lại — tool không có quyền
@@ -226,7 +233,7 @@ export default function Accounts() {
                 <td className="text-muted">{acc.notes || '—'}</td>
                 <td>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <button className="btn btn-sm" onClick={() => openForLogin(acc)}>Mở để đăng nhập</button>
+                    <button className="btn btn-sm" onClick={() => setLoginPlatformAccount(acc)}>Mở để đăng nhập</button>
                     <button className="btn btn-sm" disabled={checkingId === acc.id} onClick={() => checkLogin(acc)}>
                       {checkingId === acc.id ? 'Đang kiểm tra...' : 'Kiểm tra đăng nhập'}
                     </button>
@@ -285,6 +292,23 @@ export default function Accounts() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button className="btn" onClick={() => setShowForm(false)}>Hủy</button>
               <button className="btn btn-primary" onClick={save}>Lưu</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loginPlatformAccount && (
+        <div className="modal-backdrop" onClick={() => setLoginPlatformAccount(null)}>
+          <div className="modal" style={{ width: 320 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Đăng nhập nền tảng nào?</h3>
+              <button className="btn btn-sm" onClick={() => setLoginPlatformAccount(null)}>✕</button>
+            </div>
+            <p className="hint">Chọn nền tảng để mở đúng trang đăng nhập cho "{loginPlatformAccount.display_name}".</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button className="btn" onClick={() => openForLogin(loginPlatformAccount, 'facebook')}>Facebook</button>
+              <button className="btn" onClick={() => openForLogin(loginPlatformAccount, 'tiktok')}>TikTok</button>
+              <button className="btn" onClick={() => openForLogin(loginPlatformAccount, 'instagram')}>Instagram</button>
             </div>
           </div>
         </div>

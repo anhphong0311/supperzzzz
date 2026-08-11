@@ -43,7 +43,7 @@ const api = {
     remove: (id) => call('accounts:remove', id),
     setStatus: (id, status) => call('accounts:setStatus', id, status),
     pickProfileFolder: () => call('accounts:pickProfileFolder'),
-    openProfileForLogin: (id) => call('accounts:openProfileForLogin', id),
+    openProfileForLogin: (id, platform) => call('accounts:openProfileForLogin', id, platform),
     checkLoginStatus: (id) => call('accounts:checkLoginStatus', id),
     checkTiktokLoginStatus: (id) => call('accounts:checkTiktokLoginStatus', id)
   },

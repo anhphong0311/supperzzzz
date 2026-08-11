@@ -92,10 +92,10 @@ function registerIpcHandlers() {
     if (result.canceled || !result.filePaths[0]) return null
     return result.filePaths[0]
   })
-  handle('accounts:openProfileForLogin', async (id) => {
+  handle('accounts:openProfileForLogin', async (id, platform) => {
     const account = accountService.get(id)
     if (!account) throw new Error('Không tìm thấy tài khoản.')
-    await browserManager.openProfileForManualLogin(account.browser_profile_path)
+    await browserManager.openProfileForManualLogin(account.browser_profile_path, platform)
     return true
   })
   handle('accounts:checkLoginStatus', async (id) => {

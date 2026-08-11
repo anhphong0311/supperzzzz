@@ -37,21 +37,31 @@ async function launchProfile(browserProfilePath, { headless = false, executableP
   }
 }
 
+// URL dang nhap rieng cho tung nen tang - dung DUNG trang co form dang nhap
+// that (khong chi trang chu) de nguoi dung vao la thay ngay o nhap tai
+// khoan/mat khau, khong phai tu di tim.
+const MANUAL_LOGIN_URL = {
+  facebook: 'https://www.facebook.com/',
+  tiktok: 'https://www.tiktok.com/login/phone-or-email/email',
+  instagram: 'https://www.instagram.com/accounts/login/'
+}
+
 /**
  * Mo profile o che do co giao dien de nguoi dung tu dang nhap thu cong.
  * Tra ve context de UI co the bao nguoi dung dong cua so khi xong.
  *
- * Dieu huong sang facebook.com CHI la tien ich (da so tai khoan dung de dang
- * Facebook) - neu tai bi cham/treo vi bat ky ly do gi (mang, tai khoan chi
- * dung cho TikTok/Instagram khong lien quan facebook.com...), KHONG duoc de
- * treo vo han - nguoi dung van co the tu go dia chi khac trong chinh cua so
- * that nay. Vi vay luon co gioi han thoi gian cho va bo qua loi neu co.
+ * `platform` ('facebook' | 'tiktok' | 'instagram', mac dinh 'facebook') quyet
+ * dinh dieu huong toi dung trang dang nhap cua nen tang do. Day CHI la tien
+ * ich - neu tai bi cham/treo vi bat ky ly do gi (mang...), KHONG duoc de treo
+ * vo han - nguoi dung van co the tu go dia chi khac trong chinh cua so that
+ * nay. Vi vay luon co gioi han thoi gian cho va bo qua loi neu co.
  */
-async function openProfileForManualLogin(browserProfilePath) {
+async function openProfileForManualLogin(browserProfilePath, platform = 'facebook') {
   const context = await launchProfile(browserProfilePath, { headless: false })
   const page = context.pages()[0] || (await context.newPage())
+  const url = MANUAL_LOGIN_URL[platform] || MANUAL_LOGIN_URL.facebook
   try {
-    await page.goto('https://www.facebook.com/', { waitUntil: 'domcontentloaded', timeout: 15000 })
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 })
   } catch (err) {
     // Bo qua - cua so van mo binh thuong, nguoi dung tu go dia chi can vao.
   }
