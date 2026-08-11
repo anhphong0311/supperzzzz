@@ -3,6 +3,9 @@ const path = require('path')
 const { getDb, getDataDir } = require('../db/database')
 const settingsService = require('./settingsService')
 const serverClient = require('./serverClient')
+const accountService = require('./accountService')
+const browserManager = require('../automation/browserManager')
+const tiktokAutomation = require('../automation/tiktokAutomation')
 
 // Dong bo Google Sheet/Drive gio di qua may chu trung tam (server/routes/sheets.js)
 // - server giu 1 Service Account CHUNG, khong con moi may tu cau hinh Sheet
@@ -125,6 +128,30 @@ async function downloadVideo(id) {
 }
 
 /**
+ * Mo dung Chrome Profile cua 1 tai khoan, vao trang "Quan ly bai dang" cua
+ * TikTok Studio de lay link that cua video MOI NHAT, roi luu lai vao
+ * video_library.tiktok_post_url. Dung khi bai da dang tu truoc (vi du dang
+ * truoc khi tinh nang lay link nay ton tai) nen chua co san link.
+ */
+async function fetchTiktokLink(id, accountId) {
+  const video = get(id)
+  if (!video) throw new Error(`Không tìm thấy video id=${id}`)
+  const account = accountService.get(accountId)
+  if (!account) throw new Error('Không tìm thấy tài khoản.')
+  const settings = settingsService.getAll()
+  const headless = String(settings.headless_mode) === 'true'
+  const context = await browserManager.launchProfile(account.browser_profile_path, { headless })
+  try {
+    const page = context.pages()[0] || (await context.newPage())
+    const url = await tiktokAutomation.tryFetchLatestPostUrl(page, () => {})
+    if (url) updateRow(id, { tiktok_post_url: url })
+    return { postUrl: url }
+  } finally {
+    await context.close().catch(() => {})
+  }
+}
+
+/**
  * Ghi lai link ket qua (cot I) va tick da xong (cot K) nguoc ve dung dong
  * tren Google Sheet - CHI 2 o nay, khong dung toi cot nao khac.
  */
@@ -200,6 +227,7 @@ module.exports = {
   syncFromSheet,
   updateRow,
   downloadVideo,
+  fetchTiktokLink,
   writeBackToSheet,
   markPlatformResult,
   pickNextPending,

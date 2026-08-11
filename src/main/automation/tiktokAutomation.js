@@ -291,4 +291,4 @@ async function recheckJobStatus({ page, postUrl, targetUrl, screenshotDir, log }
   }
 }
 
-module.exports = { executeJob, recheckJobStatus }
+module.exports = { executeJob, recheckJobStatus, tryFetchLatestPostUrl }

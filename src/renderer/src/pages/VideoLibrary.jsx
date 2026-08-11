@@ -5,9 +5,12 @@ import { VIDEO_STATUS_LABEL_VI, VIDEO_STATUS_COLOR } from '../constants/statusMa
 
 export default function VideoLibrary() {
   const [videos, setVideos] = useState([])
+  const [accounts, setAccounts] = useState([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [busyId, setBusyId] = useState(null)
+  const [linkPickerVideo, setLinkPickerVideo] = useState(null)
+  const [pickedAccountId, setPickedAccountId] = useState('')
   const navigate = useNavigate()
 
   async function load() {
@@ -23,6 +26,7 @@ export default function VideoLibrary() {
 
   useEffect(() => {
     load()
+    window.api.accounts.list().then(setAccounts).catch(() => {})
   }, [])
 
   async function sync() {
@@ -65,16 +69,51 @@ export default function VideoLibrary() {
     })
   }
 
-  async function writeBack(video) {
-    setBusyId(video.id)
+  async function doWriteBack(id) {
+    setBusyId(id)
     try {
-      await window.api.videoLibrary.writeBackToSheet(video.id)
+      await window.api.videoLibrary.writeBackToSheet(id)
       toast.info('Đã ghi kết quả lên Google Sheet.')
+      load()
     } catch (err) {
       toast.error(err.message)
     } finally {
       setBusyId(null)
     }
+  }
+
+  function writeBack(video) {
+    const hasAnyLink = video.facebook_post_url || video.instagram_post_url || video.threads_post_url || video.tiktok_post_url
+    // Neu chua co link nao ma da dang xong roi - rat co the day la bai TikTok
+    // (nen tang duy nhat khong tu lay duoc link) dang tu truoc khi co tinh
+    // nang lay link nay - hoi chon tai khoan de thu lay link that truoc khi ghi.
+    if (!hasAnyLink && video.status === 'DA_DANG') {
+      setPickedAccountId('')
+      setLinkPickerVideo(video)
+      return
+    }
+    doWriteBack(video.id)
+  }
+
+  async function confirmFetchLink() {
+    const video = linkPickerVideo
+    const accountId = Number(pickedAccountId)
+    setLinkPickerVideo(null)
+    if (!accountId) {
+      await doWriteBack(video.id)
+      return
+    }
+    setBusyId(video.id)
+    try {
+      toast.info('Đang mở Chrome Profile để lấy link TikTok...')
+      const result = await window.api.videoLibrary.fetchTiktokLink(video.id, accountId)
+      toast.info(result.postUrl ? 'Đã lấy được link bài đăng TikTok.' : 'Không tự lấy được link (best-effort) - sẽ ghi Sheet không kèm link.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusyId(null)
+    }
+    await doWriteBack(video.id)
   }
 
   async function removeRow(video) {
@@ -157,6 +196,35 @@ export default function VideoLibrary() {
           </tbody>
         </table>
       </div>
+
+      {linkPickerVideo && (
+        <div className="modal-backdrop" onClick={() => setLinkPickerVideo(null)}>
+          <div className="modal" style={{ width: 380 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Lấy link bài đăng TikTok?</h3>
+              <button className="btn btn-sm" onClick={() => setLinkPickerVideo(null)}>✕</button>
+            </div>
+            <p className="hint">
+              Video "{linkPickerVideo.caption_hint}" đã đăng xong nhưng chưa có link. Chọn tài khoản
+              đã dùng để đăng video này — tool sẽ mở Chrome Profile của tài khoản đó và thử lấy link
+              thật (best-effort) trước khi ghi lên Sheet.
+            </p>
+            <div className="field">
+              <label>Tài khoản</label>
+              <select value={pickedAccountId} onChange={(e) => setPickedAccountId(e.target.value)}>
+                <option value="">-- Bỏ qua, ghi luôn không kèm link --</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>{a.display_name}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn" onClick={() => setLinkPickerVideo(null)}>Hủy</button>
+              <button className="btn btn-primary" onClick={confirmFetchLink}>Tiếp tục</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -245,6 +245,7 @@ function registerIpcHandlers() {
   handle('videoLibrary:download', (id) => videoLibraryService.downloadVideo(id))
   handle('videoLibrary:writeBackToSheet', (id) => videoLibraryService.writeBackToSheet(id))
   handle('videoLibrary:markPlatformResult', (id, platform, result) => videoLibraryService.markPlatformResult(id, platform, result))
+  handle('videoLibrary:fetchTiktokLink', (id, accountId) => videoLibraryService.fetchTiktokLink(id, accountId))
   handle('videoLibrary:remove', (id) => videoLibraryService.remove(id))
 
   // --- Lich dang tu dong ---

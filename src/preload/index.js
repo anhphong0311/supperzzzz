@@ -89,6 +89,7 @@ const api = {
     download: (id) => call('videoLibrary:download', id),
     writeBackToSheet: (id) => call('videoLibrary:writeBackToSheet', id),
     markPlatformResult: (id, platform, result) => call('videoLibrary:markPlatformResult', id, platform, result),
+    fetchTiktokLink: (id, accountId) => call('videoLibrary:fetchTiktokLink', id, accountId),
     remove: (id) => call('videoLibrary:remove', id)
   },
   schedules: {
