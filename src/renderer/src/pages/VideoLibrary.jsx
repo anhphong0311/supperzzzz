@@ -11,6 +11,7 @@ export default function VideoLibrary() {
   const [busyId, setBusyId] = useState(null)
   const [linkPickerVideo, setLinkPickerVideo] = useState(null)
   const [pickedAccountId, setPickedAccountId] = useState('')
+  const [showGuide, setShowGuide] = useState(false)
   const navigate = useNavigate()
 
   async function load() {
@@ -134,6 +135,7 @@ export default function VideoLibrary() {
           <p>Đồng bộ danh sách video từ Google Sheet, tải về máy và dùng để tạo bài đăng.</p>
         </div>
         <div className="page-actions">
+          <button className="btn" onClick={() => setShowGuide(true)}>📖 Hướng dẫn</button>
           <button className="btn btn-primary" disabled={syncing} onClick={sync}>
             {syncing ? 'Đang đồng bộ...' : 'Đồng bộ từ Google Sheet'}
           </button>
@@ -221,6 +223,55 @@ export default function VideoLibrary() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button className="btn" onClick={() => setLinkPickerVideo(null)}>Hủy</button>
               <button className="btn btn-primary" onClick={confirmFetchLink}>Tiếp tục</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showGuide && (
+        <div className="modal-backdrop" onClick={() => setShowGuide(false)}>
+          <div className="modal" style={{ width: 560, maxHeight: '85vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Hướng dẫn dùng Kho video</h3>
+              <button className="btn btn-sm" onClick={() => setShowGuide(false)}>✕</button>
+            </div>
+            <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.9 }}>
+              <li>
+                Bấm <strong>"Đồng bộ từ Google Sheet"</strong> — tool tự lấy danh sách video mới nhất
+                từ Google Sheet chung của công ty về (cột "Tên video" và "Link video"). Không cần cấu
+                hình gì cả, đã kết nối sẵn qua máy chủ chung.
+              </li>
+              <li>
+                Ở dòng video muốn dùng, bấm <strong>"Tải về"</strong> để tải file video từ Google Drive
+                xuống máy (chờ vài giây tới vài phút tuỳ dung lượng video). Tải xong sẽ thấy nhãn xanh
+                <strong> "Đã tải"</strong>.
+              </li>
+              <li>
+                Bấm <strong>"Dùng để tạo bài đăng"</strong> — tool chuyển sang trang <strong>Tạo bài
+                đăng</strong> và tự điền sẵn video + nội dung gợi ý. Chọn tài khoản/nhóm muốn đăng vào,
+                kiểm tra lại nội dung.
+              </li>
+              <li>
+                <strong>Nên bật DRY_RUN</strong> để chạy thử trước (không đăng thật), kiểm tra ảnh/video/nội
+                dung điền đúng chưa. Ưng ý rồi mới tắt DRY_RUN và bấm đăng thật.
+              </li>
+              <li>
+                Đăng xong, quay lại <strong>Kho video</strong>, bấm <strong>"Ghi lại lên Sheet"</strong>{' '}
+                để ghi lại kết quả (link bài đăng + đánh dấu "Đã đăng") ngược về Google Sheet cho mọi
+                người cùng xem.
+                <div className="hint" style={{ marginTop: 4 }}>
+                  Riêng <strong>TikTok</strong> không tự đưa ra link ngay khi đăng — nếu bấm "Ghi lại
+                  lên Sheet" mà chưa có link, tool sẽ hỏi bạn chọn đúng tài khoản đã dùng để đăng video
+                  đó, rồi tự mở Chrome tìm link giúp (có thể mất khoảng 10-20 giây).
+                </div>
+              </li>
+              <li>
+                Muốn bỏ 1 video khỏi danh sách trong tool (không xoá gì trên Google Sheet/Drive), bấm{' '}
+                <strong>"Xóa"</strong> ở dòng đó.
+              </li>
+            </ol>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+              <button className="btn btn-primary" onClick={() => setShowGuide(false)}>Đã hiểu</button>
             </div>
           </div>
         </div>
