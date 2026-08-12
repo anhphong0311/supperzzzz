@@ -9,16 +9,7 @@ const COL = { NAME: 0, VIDEO_URL: 1, RESULT_URL: 2, DONE_TICK: 3 }
 function getConfig() {
   const sheetId = process.env.GOOGLE_SHEET_ID
   const tabName = (process.env.GOOGLE_SHEET_TAB_NAME || 'Sheet1').trim()
-  if (!sheetId) {
-    // Log chan doan tam thoi - de xem trong Render Logs xem bien co that su
-    // vang mat hay chi la 1 loi khac bi bao nham thanh loi nay.
-    console.error(
-      'GOOGLE_SHEET_ID rong. Cac bien GOOGLE_* server thay duoc:',
-      Object.keys(process.env).filter((k) => k.startsWith('GOOGLE_')),
-      'do dai GOOGLE_SHEET_ID:', sheetId ? sheetId.length : 0
-    )
-    throw new Error('Server chưa cấu hình GOOGLE_SHEET_ID.')
-  }
+  if (!sheetId) throw new Error('Server chưa cấu hình GOOGLE_SHEET_ID.')
   return { sheetId, tabName }
 }
 
